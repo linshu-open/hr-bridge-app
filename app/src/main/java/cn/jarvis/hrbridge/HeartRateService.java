@@ -13,6 +13,7 @@ import android.content.pm.PackageManager;
 import android.os.*;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import org.json.JSONObject;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -22,6 +23,9 @@ import java.util.*;
 public class HeartRateService extends Service {
     private static final String TAG = "HeartRateService";
     private static final String CHANNEL_ID = "hrbridge_channel";
+    public static final String ACTION_HEART_RATE_UPDATE = "cn.jarvis.hrbridge.HEART_RATE_UPDATE";
+    public static final String EXTRA_HEART_RATE = "heart_rate";
+    public static final String EXTRA_AVG = "avg";
     private static final UUID HR_SERVICE_UUID = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb");
     private static final UUID HR_MEASUREMENT_UUID = UUID.fromString("00002a37-0000-1000-8000-00805f9b34fb");
     private static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
@@ -78,6 +82,14 @@ public class HeartRateService extends Service {
             log("HR: " + hr + " bpm");
             hrBuffer.add(hr);
             updateNotification("HR: " + hr + " bpm");
+            
+            // 发送广播通知UI更新
+            int avg = hrBuffer.size() > 1 ? (int) hrBuffer.stream().mapToInt(i -> i).average().orElse(hr) : hr;
+            Intent intent = new Intent(ACTION_HEART_RATE_UPDATE);
+            intent.putExtra(EXTRA_HEART_RATE, hr);
+            intent.putExtra(EXTRA_AVG, avg);
+            LocalBroadcastManager.getInstance(HeartRateService.this).sendBroadcast(intent);
+            
             if (hrBuffer.size() >= 10) postHeartRate();
         }
     };
