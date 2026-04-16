@@ -1,4 +1,4 @@
-package cn.jarvis.hrbriage;
+package cn.jarvis.hrbridge;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
