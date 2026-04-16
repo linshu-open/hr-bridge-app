@@ -37,39 +37,45 @@ public class HeartRateService extends Service {
             BluetoothDevice device = result.getDevice();
             String name = device.getName();
             if (name != null && name.equals(targetDeviceName)) {
-                log("鎵惧埌璁惧: " + name);
+                log("Found: " + name);
                 stopScan();
                 connectDevice(device);
             }
         }
         @Override
-        public void onScanFailed(int errorCode) { log("鎵弿澶辫触: " + errorCode); }
+        public void onScanFailed(int errorCode) { log("Scan failed: " + errorCode); }
     };
 
     private BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-            if (newState == BluetoothProfile.STATE_CONNECTED) { log("宸茶繛鎺ヨ澶?); gatt.discoverServices(); }
-            else if (newState == BluetoothProfile.STATE_DISCONNECTED) { log("璁惧鏂紑锛岄噸鏂版壂鎻?.."); handler.postDelayed(() -> startScan(), 3000); }
+            if (newState == BluetoothProfile.STATE_CONNECTED) { 
+                log("Connected"); 
+                gatt.discoverServices(); 
+            }
+            else if (newState == BluetoothProfile.STATE_DISCONNECTED) { 
+                log("Disconnected, rescanning..."); 
+                handler.postDelayed(() -> startScan(), 3000); 
+            }
         }
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             BluetoothGattService service = gatt.getService(HR_SERVICE_UUID);
-            if (service == null) { log("鏈壘鍒板績鐜囨湇鍔?); return; }
+            if (service == null) { log("HR service not found"); return; }
             BluetoothGattCharacteristic chr = service.getCharacteristic(HR_MEASUREMENT_UUID);
-            if (chr == null) { log("鏈壘鍒板績鐜囩壒寰?); return; }
+            if (chr == null) { log("HR characteristic not found"); return; }
             gatt.setCharacteristicNotification(chr, true);
             BluetoothGattDescriptor desc = chr.getDescriptor(CCCD_UUID);
             desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
             gatt.writeDescriptor(desc);
-            log("寮€濮嬬洃鍚績鐜?..");
+            log("Listening for HR...");
         }
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic chr) {
             int hr = parseHeartRate(chr);
-            log("蹇冪巼: " + hr + " bpm");
+            log("HR: " + hr + " bpm");
             hrBuffer.add(hr);
-            updateNotification("蹇冪巼: " + hr + " bpm");
+            updateNotification("HR: " + hr + " bpm");
             if (hrBuffer.size() >= 10) postHeartRate();
         }
     };
@@ -88,18 +94,18 @@ public class HeartRateService extends Service {
         serverUrl = prefs.getString("server_url", "");
         token = prefs.getString("token", "");
         targetDeviceName = prefs.getString("device_name", "");
-        startForeground(1, createNotification("姝ｅ湪鎵弿..."));
-        log("鏈嶅姟鍚姩锛岀洰鏍囪澶? " + targetDeviceName);
+        startForeground(1, createNotification("Scanning..."));
+        log("Service started, target: " + targetDeviceName);
         startScan();
         return START_STICKY;
     }
 
     private void startScan() {
-        if (scanner == null) { log("BLE 涓嶅彲鐢?); return; }
+        if (scanner == null) { log("BLE unavailable"); return; }
         ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
         if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
             scanner.startScan(null, settings, scanCallback);
-            log("寮€濮嬫壂鎻?..");
+            log("Scanning...");
         }
     }
 
@@ -108,7 +114,7 @@ public class HeartRateService extends Service {
     }
 
     private void connectDevice(BluetoothDevice device) {
-        log("姝ｅ湪杩炴帴: " + device.getName());
+        log("Connecting: " + device.getName());
         if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) gatt = device.connectGatt(this, false, gattCallback);
     }
 
@@ -135,9 +141,9 @@ public class HeartRateService extends Service {
                 os.write(json.toString().getBytes());
                 os.close();
                 int code = conn.getResponseCode();
-                log("涓婃姤鎴愬姛: " + hr + " bpm (HTTP " + code + ")");
+                log("Uploaded: " + hr + " bpm (HTTP " + code + ")");
                 conn.disconnect();
-            } catch (Exception e) { log("涓婃姤澶辫触: " + e.getMessage()); }
+            } catch (Exception e) { log("Upload failed: " + e.getMessage()); }
         }).start();
         hrBuffer.clear();
     }
@@ -152,11 +158,11 @@ public class HeartRateService extends Service {
     private void updateNotification(String text) { ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(1, createNotification(text)); }
 
     private Notification createNotification(String text) {
-        return new NotificationCompat.Builder(this, CHANNEL_ID).setContentTitle("JARVIS 蹇冪巼妗ユ帴").setContentText(text).setSmallIcon(android.R.drawable.ic_dialog_info).setOngoing(true).build();
+        return new NotificationCompat.Builder(this, CHANNEL_ID).setContentTitle("JARVIS HR Bridge").setContentText(text).setSmallIcon(android.R.drawable.ic_dialog_info).setOngoing(true).build();
     }
 
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel(CHANNEL_ID, "JARVIS 蹇冪巼妗ユ帴", NotificationManager.IMPORTANCE_LOW));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel(CHANNEL_ID, "JARVIS HR Bridge", NotificationManager.IMPORTANCE_LOW));
     }
 
     @Override
