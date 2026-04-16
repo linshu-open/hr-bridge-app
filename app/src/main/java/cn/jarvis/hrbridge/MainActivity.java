@@ -275,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
                 reader.close();
                 JSONObject json = new JSONObject(sb.toString());
                 String latestVer = json.getString("tag_name");
-                String currentVer = "v" + cn.jarvis.hrbridge.BuildConfig.VERSION_NAME;
+                String currentVer = "v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
                 if (!latestVer.equals(currentVer)) {
                     String apkUrl = json.getJSONArray("assets").getJSONObject(0).getString("browser_download_url");
                     runOnUiThread(() -> showUpdateDialog(apkUrl));
