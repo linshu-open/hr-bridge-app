@@ -17,6 +17,18 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Generate Keystore
+      run: |
+        keytool -genkeypair -v \
+          -keystore app/release.keystore \
+          -alias hrbridge \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -storepass jarvis2026 \
+          -keypass jarvis2026 \
+          -dname 'CN=JARVIS,OU=HRBridge,O=JARVIS,L=Beijing,ST=Beijing,C=CN'
+
     - name: Setup Gradle 8.6
       uses: gradle/actions/setup-gradle@v3
       with:
