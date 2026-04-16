@@ -1,5 +1,6 @@
 package cn.jarvis.hrbriage;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -8,6 +9,7 @@ import android.bluetooth.*;
 import android.bluetooth.le.*;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.*;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
