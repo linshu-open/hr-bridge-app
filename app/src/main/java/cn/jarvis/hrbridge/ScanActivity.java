@@ -1,111 +1,107 @@
 package cn.jarvis.hrbriage;
 
 import android.Manifest;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
-import android.content.SharedPreferences;
+import android.bluetooth.*;
+import android.bluetooth.le.*;
 import android.content.pm.PackageManager;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.Handler;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
-import android.widget.Toast;
+import android.os.*;
+import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import androidx.core.content.ContextCompat;
+import java.util.*;
 
 public class ScanActivity extends AppCompatActivity {
-    private ListView listView;
-    private ArrayAdapter<String> adapter;
-    private ArrayList<String> deviceList = new ArrayList<>();
-    private Map<String, BluetoothDevice> deviceMap = new HashMap<>();
+    private ListView listDevices;
     private BluetoothLeScanner scanner;
-    private SharedPreferences prefs;
-    private Handler handler = new Handler();
-    private static final int SCAN_TIMEOUT = 10000;
-
-    private ScanCallback scanCallback = new ScanCallback() {
-        @Override
-        public void onScanResult(int callbackType, ScanResult result) {
-            BluetoothDevice device = result.getDevice();
-            String name = device.getName();
-            String address = device.getAddress();
-            if (name != null && !deviceMap.containsKey(address)) {
-                deviceMap.put(address, device);
-                deviceList.add(name + "\n" + address + " (" + result.getRssi() + "dBm)");
-                adapter.notifyDataSetChanged();
-            }
-        }
-        @Override
-        public void onScanFailed(int errorCode) {
-            Toast.makeText(ScanActivity.this, "鎵弿澶辫触: " + errorCode, Toast.LENGTH_LONG).show();
-        }
-    };
+    private List<ScanResult> deviceList = new ArrayList<>();
+    private ArrayAdapter<String> adapter;
+    private boolean scanning = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_scan);
-        setTitle("鎵弿璁惧");
-        prefs = getSharedPreferences("hrbridge", MODE_PRIVATE);
-        listView = findViewById(R.id.list_devices);
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, deviceList);
-        listView.setAdapter(adapter);
-        listView.setOnItemClickListener((parent, view, position, id) -> {
-            String item = deviceList.get(position);
-            String address = item.split("\n")[1].split(" ")[0];
-            BluetoothDevice device = deviceMap.get(address);
-            prefs.edit().putString("device_name", device.getName()).putString("device_address", address).apply();
-            Toast.makeText(this, "宸查€夋嫨: " + device.getName(), Toast.LENGTH_SHORT).show();
-            finish();
-        });
-        if (checkPermissions()) startScan();
-    }
-
-    private boolean checkPermissions() {
-        String[] permissions = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ?
-            new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.ACCESS_FINE_LOCATION} :
-            new String[]{Manifest.permission.ACCESS_FINE_LOCATION};
-        for (String p : permissions) {
-            if (ActivityCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, permissions, 1);
-                return false;
+        listDevices = findViewById(R.id.list_devices);
+        
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
+        listDevices.setAdapter(adapter);
+        
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter != null) scanner = adapter.getBluetoothLeScanner();
+        
+        listDevices.setOnItemClickListener((parent, view, position, id) -> {
+            if (position < deviceList.size()) {
+                ScanResult result = deviceList.get(position);
+                Intent data = new Intent();
+                data.putExtra("device_name", result.getDevice().getName());
+                data.putExtra("device_address", result.getDevice().getAddress());
+                setResult(RESULT_OK, data);
+                finish();
             }
-        }
-        return true;
+        });
+        
+        startScan();
     }
 
     private void startScan() {
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (adapter == null || !adapter.isEnabled()) {
-            Toast.makeText(this, "璇峰厛寮€鍚摑鐗?, Toast.LENGTH_LONG).show();
-            finish();
+        if (scanner == null) {
+            Toast.makeText(this, R.string.no_ble_devices, Toast.LENGTH_LONG).show();
             return;
         }
-        scanner = adapter.getBluetoothLeScanner();
-        ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
-            scanner.startScan(null, settings, scanCallback);
-            handler.postDelayed(this::stopScan, SCAN_TIMEOUT);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, R.string.no_ble_devices, Toast.LENGTH_LONG).show();
+            return;
         }
-    }
-
-    private void stopScan() {
-        if (scanner != null && scanCallback != null) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
-                scanner.stopScan(scanCallback);
+        
+        scanning = true;
+        adapter.clear();
+        deviceList.clear();
+        adapter.add(getString(R.string.scanning));
+        
+        ScanCallback callback = new ScanCallback() {
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                runOnUiThread(() -> {
+                    BluetoothDevice device = result.getDevice();
+                    String name = device.getName();
+                    if (name != null && !name.isEmpty()) {
+                        String info = name + "\n" + device.getAddress() + " (RSSI: " + result.getRssi() + ")";
+                        // Check if already in list
+                        boolean found = false;
+                        for (ScanResult r : deviceList) {
+                            if (r.getDevice().getAddress().equals(device.getAddress())) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            deviceList.add(result);
+                            adapter.add(info);
+                        }
+                    }
+                });
             }
-        }
-        if (deviceList.isEmpty()) Toast.makeText(this, "鏈壘鍒拌澶?, Toast.LENGTH_LONG).show();
+            
+            @Override
+            public void onScanFailed(int errorCode) {
+                runOnUiThread(() -> Toast.makeText(ScanActivity.this, R.string.no_ble_devices, Toast.LENGTH_LONG).show());
+            }
+        };
+        
+        ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
+        scanner.startScan(null, settings, callback);
+        
+        // Stop after 10 seconds
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (scanning) {
+                scanning = false;
+                if (ContextCompat.checkSelfPermission(ScanActivity.this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+                    scanner.stopScan(callback);
+                }
+                if (deviceList.isEmpty()) {
+                    Toast.makeText(ScanActivity.this, R.string.no_ble_devices, Toast.LENGTH_LONG).show();
+                }
+            }
+        }, 10000);
     }
-
-    @Override
-    protected void onDestroy() { super.onDestroy(); stopScan(); }
 }
