@@ -22,7 +22,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQ_PERMS = 1;
     private static final int REQ_ENABLE_BT = 2;
     private TextView tvDeviceName, tvStatus, tvHeartRate, tvLog;
-    private Button btnScan, btnStart, btnStop, btnSettings, btnClearLog;
+    private Button btnScan, btnStart, btnStop, btnSettings, btnClearLog, btnTestServer;
     private SharedPreferences prefs;
     private AtomicBoolean logUpdating = new AtomicBoolean(false);
     
@@ -58,6 +58,7 @@ public class MainActivity extends AppCompatActivity {
         btnStop = findViewById(R.id.btn_stop);
         btnSettings = findViewById(R.id.btn_settings);
         btnClearLog = findViewById(R.id.btn_clear_log);
+        btnTestServer = findViewById(R.id.btn_test_server);
 
         // Load saved settings
         String deviceName = prefs.getString("device_name", "");
@@ -96,6 +97,8 @@ public class MainActivity extends AppCompatActivity {
         });
 
         btnSettings.setOnClickListener(v -> showSettingsDialog());
+
+        btnTestServer.setOnClickListener(v -> testServerConnection());
 
         btnClearLog.setOnClickListener(v -> {
             prefs.edit().putString("log", "").apply();
@@ -230,6 +233,77 @@ public class MainActivity extends AppCompatActivity {
         String newLog = log + "\n[" + time + "] " + msg;
         prefs.edit().putString("log", newLog).apply();
         tvLog.setText(newLog);
+    }
+
+    private void testServerConnection() {
+        String url = prefs.getString("server_url", "");
+        if (url.isEmpty()) {
+            Toast.makeText(this, "请先设置服务器地址", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        addLog("测试服务器连接...");
+        btnTestServer.setEnabled(false);
+        btnTestServer.setText("测试中...");
+        
+        new Thread(() -> {
+            try {
+                // 发送模拟心率数据
+                JSONObject json = new JSONObject();
+                json.put("hr", 75);
+                json.put("avg", 75);
+                json.put("status", "test");
+                json.put("trend", "stable");
+                json.put("samples", 1);
+                json.put("device", "test");
+                json.put("ts", System.currentTimeMillis() / 1000);
+                
+                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+                
+                OutputStream os = conn.getOutputStream();
+                os.write(json.toString().getBytes());
+                os.close();
+                
+                int code = conn.getResponseCode();
+                String response = "";
+                try {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) sb.append(line);
+                    reader.close();
+                    response = sb.toString();
+                } catch (Exception e) {
+                    response = e.getMessage();
+                }
+                conn.disconnect();
+                
+                final String result = "HTTP " + code + ": " + response;
+                runOnUiThread(() -> {
+                    addLog("服务器响应: " + result);
+                    if (code == 200) {
+                        Toast.makeText(MainActivity.this, "服务器连接正常!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(MainActivity.this, "服务器响应异常: " + code, Toast.LENGTH_SHORT).show();
+                    }
+                    btnTestServer.setEnabled(true);
+                    btnTestServer.setText("测试服务器连接");
+                });
+            } catch (Exception e) {
+                final String error = e.getMessage();
+                runOnUiThread(() -> {
+                    addLog("连接失败: " + error);
+                    Toast.makeText(MainActivity.this, "连接失败: " + error, Toast.LENGTH_LONG).show();
+                    btnTestServer.setEnabled(true);
+                    btnTestServer.setText("测试服务器连接");
+                });
+            }
+        }).start();
     }
 
     private void showSettingsDialog() {
