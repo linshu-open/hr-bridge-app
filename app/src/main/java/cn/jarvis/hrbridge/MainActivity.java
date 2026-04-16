@@ -12,6 +12,7 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import org.json.JSONObject;
 import java.io.*;
 import java.net.*;
@@ -24,6 +25,23 @@ public class MainActivity extends AppCompatActivity {
     private Button btnScan, btnStart, btnStop, btnSettings, btnClearLog;
     private SharedPreferences prefs;
     private AtomicBoolean logUpdating = new AtomicBoolean(false);
+    
+    private BroadcastReceiver heartRateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            int hr = intent.getIntExtra(HeartRateService.EXTRA_HEART_RATE, 0);
+            int avg = intent.getIntExtra(HeartRateService.EXTRA_AVG, 0);
+            runOnUiThread(() -> {
+                tvHeartRate.setText(hr + " bpm");
+                tvHeartRate.setTextColor(getResources().getColor(
+                    hr < 60 ? android.R.color.holo_blue_dark :
+                    hr <= 100 ? android.R.color.holo_green_dark :
+                    hr <= 120 ? android.R.color.holo_orange_dark :
+                    android.R.color.holo_red_dark
+                ));
+            });
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,6 +104,19 @@ public class MainActivity extends AppCompatActivity {
 
         // Check for updates
         checkUpdate();
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter(HeartRateService.ACTION_HEART_RATE_UPDATE);
+        LocalBroadcastManager.getInstance(this).registerReceiver(heartRateReceiver, filter);
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause();
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(heartRateReceiver);
     }
 
     private boolean checkBluetoothAndPermissions() {
