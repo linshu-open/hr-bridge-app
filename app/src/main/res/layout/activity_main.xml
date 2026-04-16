@@ -1,17 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="16dp">
-    <TextView android:id="@+id/tv_device_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="鏈€夋嫨璁惧" android:textSize="16sp" android:layout_marginBottom="8dp" />
-    <TextView android:id="@+id/tv_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="鐘舵€? 鏈惎鍔? android:textSize="18sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
-    <TextView android:id="@+id/tv_heart_rate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="蹇冪巼: -- bpm" android:textSize="48sp" android:textStyle="bold" android:textColor="#FF5722" android:layout_marginBottom="16dp" />
-    <Button android:id="@+id/btn_scan" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="鎵弿閫夋嫨璁惧" android:textSize="16sp" />
-    <Button android:id="@+id/btn_start" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="寮€濮嬫湇鍔? android:textSize="16sp" android:layout_marginTop="8dp" />
-    <Button android:id="@+id/btn_stop" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="鍋滄鏈嶅姟" android:textSize="16sp" android:layout_marginTop="8dp" />
-    <Button android:id="@+id/btn_settings" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="璁剧疆鏈嶅姟鍣? android:textSize="16sp" android:layout_marginTop="8dp" />
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="璋冭瘯鏃ュ織:" android:textSize="14sp" android:textStyle="bold" android:layout_marginTop="16dp" />
-    <Button android:id="@+id/btn_clear_log" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="娓呯┖鏃ュ織" android:textSize="12sp" android:layout_marginTop="4dp" />
-    <ScrollView android:id="@+id/scroll_log" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:background="#F5F5F5" android:padding="8dp" android:layout_marginTop="8dp">
-        <TextView android:id="@+id/tv_log" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="鏆傛棤鏃ュ織" android:textSize="12sp" android:fontFamily="monospace" />
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tv_device_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/no_device"
+        android:textSize="16sp"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tv_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/status_stopped"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:id="@+id/tv_heart_rate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/heart_rate_placeholder"
+        android:textSize="48sp"
+        android:textStyle="bold"
+        android:textColor="#FF5722"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btn_scan"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_scan"
+        android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/btn_start"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_start"
+        android:textSize="16sp"
+        android:layout_marginTop="8dp" />
+
+    <Button
+        android:id="@+id/btn_stop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_stop"
+        android:textSize="16sp"
+        android:layout_marginTop="8dp" />
+
+    <Button
+        android:id="@+id/btn_settings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_settings"
+        android:textSize="16sp"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/debug_log"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp" />
+
+    <Button
+        android:id="@+id/btn_clear_log"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_clear_log"
+        android:textSize="12sp"
+        android:layout_marginTop="4dp" />
+
+    <ScrollView
+        android:id="@+id/scroll_log"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#F5F5F5"
+        android:padding="8dp"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:id="@+id/tv_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/no_log"
+            android:textSize="12sp"
+            android:fontFamily="monospace" />
     </ScrollView>
 </LinearLayout>
