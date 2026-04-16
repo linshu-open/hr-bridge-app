@@ -108,12 +108,19 @@ public class MainActivity extends AppCompatActivity {
         
         addLog("蓝牙已开启");
 
-        // 检查权限
-        String[] perms = {
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.ACCESS_FINE_LOCATION  // HarmonyOS 需要位置权限才能扫描BLE
-        };
+        // 根据Android版本请求不同权限
+        // Android 12+ (API 31+) 只需要 BLUETOOTH_SCAN 和 BLUETOOTH_CONNECT
+        // Android 11及以下需要 ACCESS_FINE_LOCATION
+        java.util.List<String> permList = new java.util.ArrayList<>();
+        permList.add(Manifest.permission.BLUETOOTH_SCAN);
+        permList.add(Manifest.permission.BLUETOOTH_CONNECT);
+        
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+            permList.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        
+        String[] perms = permList.toArray(new String[0]);
+        addLog("Android " + android.os.Build.VERSION.SDK_INT + ", 需要权限: " + java.util.Arrays.toString(perms));
         
         java.util.List<String> notGranted = new java.util.ArrayList<>();
         for (String p : perms) {
