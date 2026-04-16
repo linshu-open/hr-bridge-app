@@ -6,20 +6,19 @@ import android.bluetooth.le.*;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.*;
+import android.util.Log;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import java.util.*;
 
 public class ScanActivity extends AppCompatActivity {
+    private static final String TAG = "ScanActivity";
     private ListView listDevices;
     private BluetoothLeScanner scanner;
     private List<ScanResult> deviceList = new ArrayList<>();
     private ArrayAdapter<String> adapter;
     private boolean scanning = false;
-    
-    // Heart Rate Service UUID - 只扫描支持心率广播的设备
-    private static final UUID HR_SERVICE_UUID = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,7 +30,12 @@ public class ScanActivity extends AppCompatActivity {
         listDevices.setAdapter(adapter);
 
         BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (btAdapter != null) scanner = btAdapter.getBluetoothLeScanner();
+        if (btAdapter != null) {
+            scanner = btAdapter.getBluetoothLeScanner();
+            Log.i(TAG, "BLE scanner initialized");
+        } else {
+            Log.e(TAG, "No Bluetooth adapter found!");
+        }
 
         listDevices.setOnItemClickListener((parent, view, position, id) -> {
             if (position < deviceList.size()) {
@@ -49,11 +53,14 @@ public class ScanActivity extends AppCompatActivity {
 
     private void startScan() {
         if (scanner == null) {
-            Toast.makeText(this, R.string.no_ble_devices, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "BLE不可用", Toast.LENGTH_LONG).show();
+            finish();
             return;
         }
+        
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, R.string.no_ble_devices, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "缺少蓝牙扫描权限", Toast.LENGTH_LONG).show();
+            finish();
             return;
         }
 
@@ -61,14 +68,9 @@ public class ScanActivity extends AppCompatActivity {
         adapter.clear();
         deviceList.clear();
         adapter.add(getString(R.string.scanning));
+        Log.i(TAG, "Starting BLE scan...");
 
-        // 过滤 Heart Rate Service UUID - 只显示支持心率广播的设备
-        List<ScanFilter> filters = new ArrayList<>();
-        ScanFilter filter = new ScanFilter.Builder()
-            .setServiceUuid(new ParcelUuid(HR_SERVICE_UUID))
-            .build();
-        filters.add(filter);
-
+        // 不使用UUID过滤，扫描所有设备
         ScanSettings settings = new ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build();
@@ -79,6 +81,10 @@ public class ScanActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     BluetoothDevice device = result.getDevice();
                     String name = device.getName();
+                    
+                    // 记录所有扫描到的设备
+                    Log.d(TAG, "Found device: " + (name != null ? name : "unnamed") + " @ " + device.getAddress());
+                    
                     if (name != null && !name.isEmpty()) {
                         String info = name + "\n" + device.getAddress() + " (RSSI: " + result.getRssi() + ")";
                         boolean found = false;
@@ -91,6 +97,7 @@ public class ScanActivity extends AppCompatActivity {
                         if (!found) {
                             deviceList.add(result);
                             adapter.add(info);
+                            Log.i(TAG, "Added device: " + name);
                         }
                     }
                 });
@@ -98,13 +105,14 @@ public class ScanActivity extends AppCompatActivity {
 
             @Override
             public void onScanFailed(int errorCode) {
+                Log.e(TAG, "Scan failed: " + errorCode);
                 runOnUiThread(() -> Toast.makeText(ScanActivity.this, 
                     "扫描失败: " + errorCode, Toast.LENGTH_LONG).show());
             }
         };
 
-        // 使用过滤扫描 - 只扫描心率广播设备
-        scanner.startScan(filters, settings, callback);
+        // 不使用过滤器
+        scanner.startScan(null, settings, callback);
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (scanning) {
@@ -112,12 +120,21 @@ public class ScanActivity extends AppCompatActivity {
                 if (ContextCompat.checkSelfPermission(ScanActivity.this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
                     scanner.stopScan(callback);
                 }
+                
+                // 移除"正在扫描"提示
+                if (adapter.getCount() > 0) {
+                    String first = adapter.getItem(0);
+                    if (first != null && first.contains(getString(R.string.scanning))) {
+                        adapter.remove(first);
+                    }
+                }
+                
                 if (deviceList.isEmpty()) {
                     Toast.makeText(ScanActivity.this, 
-                        "未找到心率广播设备，请确认手环已开启心率广播", 
+                        "未找到任何BLE设备", 
                         Toast.LENGTH_LONG).show();
                 }
             }
-        }, 10000);
+        }, 15000);  // 延长到15秒
     }
 }
