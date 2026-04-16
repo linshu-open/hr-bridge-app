@@ -3,6 +3,7 @@ package cn.jarvis.hrbriage;
 import android.Manifest;
 import android.bluetooth.*;
 import android.bluetooth.le.*;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.*;
 import android.widget.*;
@@ -66,7 +67,6 @@ public class ScanActivity extends AppCompatActivity {
                     String name = device.getName();
                     if (name != null && !name.isEmpty()) {
                         String info = name + "\n" + device.getAddress() + " (RSSI: " + result.getRssi() + ")";
-                        // Check if already in list
                         boolean found = false;
                         for (ScanResult r : deviceList) {
                             if (r.getDevice().getAddress().equals(device.getAddress())) {
@@ -91,7 +91,6 @@ public class ScanActivity extends AppCompatActivity {
         ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
         scanner.startScan(null, settings, callback);
         
-        // Stop after 10 seconds
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (scanning) {
                 scanning = false;
