@@ -1,4 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">JARVIS 蹇冪巼妗ユ帴</string>
+    <string name="no_device">鏈€夋嫨璁惧</string>
+    <string name="status_stopped">鐘舵€? 鏈惎鍔?/string>
+    <string name="heart_rate_placeholder">蹇冪巼: -- bpm</string>
+    <string name="btn_scan">鎵弿閫夋嫨璁惧</string>
+    <string name="btn_start">寮€濮嬫湇鍔?/string>
+    <string name="btn_stop">鍋滄鏈嶅姟</string>
+    <string name="btn_settings">璁剧疆鏈嶅姟鍣?/string>
+    <string name="debug_log">璋冭瘯鏃ュ織:</string>
+    <string name="btn_clear_log">娓呯┖鏃ュ織</string>
+    <string name="no_log">鏆傛棤鏃ュ織</string>
+    <string name="scan_hint">鎵弿鍒扮殑璁惧 (10绉掑悗鑷姩鍋滄):</string>
+    <string name="server_url_label">鏈嶅姟鍣ㄥ湴鍧€:</string>
+    <string name="token_label">Token:</string>
+    <string name="token_hint">璁よ瘉浠ょ墝</string>
+    <string name="scanning">姝ｅ湪鎵弿...</string>
+    <string name="no_ble_devices">鏈壘鍒癇LE璁惧</string>
+    <string name="select_device">閫夋嫨璁惧</string>
+    <string name="device_selected">宸查€夋嫨璁惧</string>
+    <string name="service_running">鏈嶅姟杩愯涓?/string>
+    <string name="service_stopped">鏈嶅姟宸插仠姝?/string>
+    <string name="update_available">鍙戠幇鏂扮増鏈?/string>
+    <string name="update_now">绔嬪嵆鏇存柊</string>
+    <string name="later">绋嶅悗</string>
 </resources>
