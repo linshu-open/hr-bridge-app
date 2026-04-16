@@ -1,9 +1,9 @@
 plugins { id 'com.android.application' }
 android {
-    namespace 'cn.jarvis.hrbriage'
+    namespace 'cn.jarvis.hrbridge'
     compileSdk 34
     defaultConfig {
-        applicationId "cn.jarvis.hrbriage"
+        applicationId "cn.jarvis.hrbridge"
         minSdk 21
         targetSdk 34
         versionCode 3
