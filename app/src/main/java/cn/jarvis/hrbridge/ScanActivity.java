@@ -17,19 +17,22 @@ public class ScanActivity extends AppCompatActivity {
     private List<ScanResult> deviceList = new ArrayList<>();
     private ArrayAdapter<String> adapter;
     private boolean scanning = false;
+    
+    // Heart Rate Service UUID - 只扫描支持心率广播的设备
+    private static final UUID HR_SERVICE_UUID = UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_scan);
         listDevices = findViewById(R.id.list_devices);
-        
+
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
         listDevices.setAdapter(adapter);
-        
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (adapter != null) scanner = adapter.getBluetoothLeScanner();
-        
+
+        BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (btAdapter != null) scanner = btAdapter.getBluetoothLeScanner();
+
         listDevices.setOnItemClickListener((parent, view, position, id) -> {
             if (position < deviceList.size()) {
                 ScanResult result = deviceList.get(position);
@@ -40,7 +43,7 @@ public class ScanActivity extends AppCompatActivity {
                 finish();
             }
         });
-        
+
         startScan();
     }
 
@@ -53,12 +56,23 @@ public class ScanActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.no_ble_devices, Toast.LENGTH_LONG).show();
             return;
         }
-        
+
         scanning = true;
         adapter.clear();
         deviceList.clear();
         adapter.add(getString(R.string.scanning));
-        
+
+        // 过滤 Heart Rate Service UUID - 只显示支持心率广播的设备
+        List<ScanFilter> filters = new ArrayList<>();
+        ScanFilter filter = new ScanFilter.Builder()
+            .setServiceUuid(new ParcelUuid(HR_SERVICE_UUID))
+            .build();
+        filters.add(filter);
+
+        ScanSettings settings = new ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .build();
+
         ScanCallback callback = new ScanCallback() {
             @Override
             public void onScanResult(int callbackType, ScanResult result) {
@@ -81,16 +95,17 @@ public class ScanActivity extends AppCompatActivity {
                     }
                 });
             }
-            
+
             @Override
             public void onScanFailed(int errorCode) {
-                runOnUiThread(() -> Toast.makeText(ScanActivity.this, R.string.no_ble_devices, Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(ScanActivity.this, 
+                    "扫描失败: " + errorCode, Toast.LENGTH_LONG).show());
             }
         };
-        
-        ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
-        scanner.startScan(null, settings, callback);
-        
+
+        // 使用过滤扫描 - 只扫描心率广播设备
+        scanner.startScan(filters, settings, callback);
+
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             if (scanning) {
                 scanning = false;
@@ -98,7 +113,9 @@ public class ScanActivity extends AppCompatActivity {
                     scanner.stopScan(callback);
                 }
                 if (deviceList.isEmpty()) {
-                    Toast.makeText(ScanActivity.this, R.string.no_ble_devices, Toast.LENGTH_LONG).show();
+                    Toast.makeText(ScanActivity.this, 
+                        "未找到心率广播设备，请确认手环已开启心率广播", 
+                        Toast.LENGTH_LONG).show();
                 }
             }
         }, 10000);
