@@ -1,37 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="手环设备名称"
-        android:textSize="14sp" />
-
-    <EditText
-        android:id="@+id/et_device_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:hint="HUAWEI Band 10-2A8"
-        android:text="HUAWEI Band 10-2A8" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="扫描间隔 (秒)"
-        android:textSize="14sp" />
-
-    <EditText
-        android:id="@+id/et_interval"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:inputType="number"
-        android:text="30" />
-
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="16dp">
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="鏈嶅姟鍣ㄥ湴鍧€:" android:textSize="14sp" />
+    <EditText android:id="@+id/et_server_url" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="http://ip:port/jarvis/sensor/heart-rate" android:inputType="textUri" android:layout_marginBottom="16dp" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Token:" android:textSize="14sp" />
+    <EditText android:id="@+id/et_token" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="璁よ瘉浠ょ墝" android:inputType="text" />
 </LinearLayout>
