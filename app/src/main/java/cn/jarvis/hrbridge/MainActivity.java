@@ -237,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
                 reader.close();
                 JSONObject json = new JSONObject(sb.toString());
                 String latestVer = json.getString("tag_name");
-                String currentVer = "v1.2.2";
+                String currentVer = "v1.2.3";
                 if (!latestVer.equals(currentVer)) {
                     String apkUrl = json.getJSONArray("assets").getJSONObject(0).getString("browser_download_url");
                     runOnUiThread(() -> showUpdateDialog(apkUrl));
