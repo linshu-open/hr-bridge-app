@@ -86,7 +86,8 @@ public class ScanActivity extends AppCompatActivity {
         scanning = true;
         adapter.clear();
         deviceList.clear();
-        adapter.add("正在扫描...");
+        listDevices.setEnabled(false);  // 扫描期间禁用点击
+        tvStatus.setText("正在扫描...（请等待完成后再选择）");
         Log.i(TAG, "Starting BLE scan...");
 
         ScanSettings settings = new ScanSettings.Builder()
@@ -117,7 +118,7 @@ public class ScanActivity extends AppCompatActivity {
                             deviceList.add(result);
                             adapter.add(info);
                             deviceCount++;
-                            tvStatus.setText("已发现 " + deviceCount + " 个设备");
+                            tvStatus.setText("扫描中... 已发现 " + deviceCount + " 个设备（请等待完成）");
                             Log.i(TAG, "Added: " + name);
                         }
                     }
@@ -129,6 +130,7 @@ public class ScanActivity extends AppCompatActivity {
                 Log.e(TAG, "Scan failed: " + errorCode);
                 runOnUiThread(() -> {
                     tvStatus.setText("扫描失败: " + errorCode);
+                    listDevices.setEnabled(true);
                     Toast.makeText(ScanActivity.this, 
                         "扫描失败: " + errorCode, Toast.LENGTH_LONG).show();
                 });
@@ -144,18 +146,12 @@ public class ScanActivity extends AppCompatActivity {
                     scanner.stopScan(callback);
                 }
                 
-                // 移除"正在扫描"提示
-                if (adapter.getCount() > 0) {
-                    String first = adapter.getItem(0);
-                    if (first != null && first.contains("正在扫描")) {
-                        adapter.remove(first);
-                    }
-                }
+                listDevices.setEnabled(true);  // 扫描完成后启用点击
                 
                 if (deviceList.isEmpty()) {
                     tvStatus.setText("未找到任何BLE设备\n请确认:\n1. 手环已开启心率广播\n2. 手机蓝牙已开启\n3. 已授予位置权限");
                 } else {
-                    tvStatus.setText("扫描完成，发现 " + deviceList.size() + " 个设备");
+                    tvStatus.setText("扫描完成，发现 " + deviceList.size() + " 个设备（点击选择）");
                 }
             }
         }, 15000);
