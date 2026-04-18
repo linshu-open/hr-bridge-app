@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- 不备份敏感配置与心率缓存 -->
+    <exclude domain="sharedpref" path="hrbridge.xml"/>
+    <exclude domain="database" path="hr_bridge.db"/>
+    <exclude domain="file" path="datastore/settings.preferences_pb"/>
+</full-backup-content>

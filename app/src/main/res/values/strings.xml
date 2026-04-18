@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JARVIS 心率桥接</string>
+    <!-- 通知渠道 -->
+    <string name="notif_channel_service">心率后台服务</string>
+    <string name="notif_channel_alert">心率告警</string>
+    <string name="notif_service_title">JARVIS HR Bridge</string>
+    <string name="notif_service_scanning">正在扫描设备…</string>
+    <string name="notif_service_connected">已连接 %1$s · %2$d bpm</string>
+</resources>
