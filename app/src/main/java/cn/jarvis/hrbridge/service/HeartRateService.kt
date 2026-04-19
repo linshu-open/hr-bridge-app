@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import cn.jarvis.hrbridge.ServiceLocator
 import cn.jarvis.hrbridge.ble.BleConnection
 import cn.jarvis.hrbridge.data.prefs.AppSettings
+import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.util.ExponentialBackoff
 import cn.jarvis.hrbridge.util.HrStatus
 import cn.jarvis.hrbridge.util.Logger
@@ -34,6 +35,7 @@ class HeartRateService : LifecycleService() {
     private lateinit var connection: BleConnection
     private val backoff = ExponentialBackoff(baseMs = 3_000L, maxAttempts = Int.MAX_VALUE, factor = 3.0)
     private var reconnectJob: Job? = null
+    private var realtimeModeJob: Job? = null
     private var attempt = 0
 
     private val recentHrBuffer = ArrayDeque<Int>()
@@ -59,14 +61,25 @@ class HeartRateService : LifecycleService() {
             val s = ServiceLocator.settingsStore.settings.first()
             currentDeviceMac = s.selectedDeviceMac
             currentDeviceName = s.selectedDeviceName
-            if (currentDeviceMac.isEmpty()) {
-                Logger.w("HRService", "未配置设备，停止服务")
-                stopSelf()
-                return@launch
-            }
+
             // 注册周期上传任务（幂等）
             UploadWorker.schedule(this@HeartRateService)
-            connection.connect(currentDeviceMac)
+
+            // 启动通用传感器（即使没选手环也可以跑其他传感器）
+            runCatching {
+                ServiceLocator.sensorHub.start(
+                    scope = lifecycleScope,
+                    enabled = s.enabledSensors,
+                    mode = s.uploadMode
+                )
+                ServiceLocator.alertManager.start(lifecycleScope)
+            }.onFailure { Logger.w("HRService", "SensorHub start failed: ${it.message}") }
+
+            if (currentDeviceMac.isEmpty()) {
+                Logger.w("HRService", "未配置手环 MAC；仅运行手机传感器")
+            } else {
+                connection.connect(currentDeviceMac)
+            }
         }
 
         return START_STICKY
@@ -132,10 +145,11 @@ class HeartRateService : LifecycleService() {
                 recentHrForTrend = recentHrBuffer.toList()
             )
 
-            // 紧急心率：立即单条上传 + 考虑本地告警
+            // 紧急心率：立即单条上传 + 考虑本地告警 + 自动切实时模式
             if (status.isCritical) {
                 ServiceLocator.hrRepository.uploadImmediate(id)
                 maybeTriggerLocalAlert(hr, status, settings)
+                switchToRealtimeTemporarily()
             } else {
                 criticalSinceMs = 0L
             }
@@ -171,6 +185,17 @@ class HeartRateService : LifecycleService() {
                else hour >= start || hour < end
     }
 
+    /** HR 异常时自动将传感器切换到 REALTIME 模式，5 分钟后回落 */
+    private fun switchToRealtimeTemporarily() {
+        realtimeModeJob?.cancel()
+        ServiceLocator.sensorHub.applyMode(UploadMode.REALTIME)
+        realtimeModeJob = lifecycleScope.launch {
+            delay(5 * 60_000L)
+            val current = ServiceLocator.settingsStore.settings.first().uploadMode
+            ServiceLocator.sensorHub.applyMode(current)
+        }
+    }
+
     private fun scheduleReconnect() {
         if (reconnectJob?.isActive == true) return
         val delay = backoff.nextDelayMs(attempt) ?: 405_000L
@@ -185,7 +210,10 @@ class HeartRateService : LifecycleService() {
 
     override fun onDestroy() {
         reconnectJob?.cancel()
+        realtimeModeJob?.cancel()
         connection.disconnect()
+        runCatching { ServiceLocator.alertManager.stop() }
+        runCatching { ServiceLocator.sensorHub.stop() }
         super.onDestroy()
     }
 
