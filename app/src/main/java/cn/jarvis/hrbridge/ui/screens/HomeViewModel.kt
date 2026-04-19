@@ -23,6 +23,8 @@ data class HomeUiState(
     val avg: Int? = null,
     val max: Int? = null,
     val pendingCount: Int = 0,
+    val sensorPendingCount: Int = 0,
+    val sensorRunningTypes: Set<String> = emptySet(),
     val settings: AppSettings = AppSettings(),
     val testing: Boolean = false,
     val lastTestMessage: String? = null
@@ -33,6 +35,8 @@ data class HomeUiState(
 
 class HomeViewModel : ViewModel() {
     private val repo = ServiceLocator.hrRepository
+    private val sensorRepo = ServiceLocator.sensorRepository
+    private val sensorHub = ServiceLocator.sensorHub
     private val settingsStore = ServiceLocator.settingsStore
     private val jarvisApi = ServiceLocator.jarvisApi
 
@@ -43,18 +47,17 @@ class HomeViewModel : ViewModel() {
         repo.observeRecent().map { list -> list.map { it.hr }.reversed() }
 
     val state: StateFlow<HomeUiState> = combine(
-        recentFlow,
-        repo.observePendingCount(),
-        settingsStore.settings,
-        _testing,
-        _testMessage
-    ) { samples, pending, settings, testing, msg ->
+        combine(recentFlow, repo.observePendingCount(), sensorRepo.observePendingCount()) { samples, pending, sensorPending -> Triple(samples, pending, sensorPending) },
+        combine(settingsStore.settings, _testing, _testMessage) { settings, testing, msg -> Triple(settings, testing, msg) }
+    ) { (samples, pending, sensorPending), (settings, testing, msg) ->
         HomeUiState(
             hrSamples = samples,
             min = samples.minOrNull(),
             avg = if (samples.isEmpty()) null else samples.average().toInt(),
             max = samples.maxOrNull(),
             pendingCount = pending,
+            sensorPendingCount = sensorPending,
+            sensorRunningTypes = sensorHub.runningTypes(),
             settings = settings,
             testing = testing,
             lastTestMessage = msg
