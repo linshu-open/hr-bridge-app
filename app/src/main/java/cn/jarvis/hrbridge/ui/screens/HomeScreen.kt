@@ -27,6 +27,7 @@ import cn.jarvis.hrbridge.BuildConfig
 import cn.jarvis.hrbridge.service.HeartRateService
 import cn.jarvis.hrbridge.ui.components.HrHero
 import cn.jarvis.hrbridge.ui.components.PermissionDeniedDialog
+import cn.jarvis.hrbridge.ui.components.SensorCards
 import cn.jarvis.hrbridge.ui.components.StatsCards
 import cn.jarvis.hrbridge.ui.components.TrendChart
 import cn.jarvis.hrbridge.ui.components.openAppSettings
@@ -61,7 +62,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("JARVIS 心率桥接") },
+                title = { Text("JARVIS Sensor Bridge") },
                 actions = {
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
@@ -87,6 +88,12 @@ fun HomeScreen(
             StatsCards(state.min, state.avg, state.max)
 
             TrendChart(data = state.hrSamples)
+
+            SensorCards(
+                runningTypes = state.sensorRunningTypes,
+                sensorPendingCount = state.sensorPendingCount,
+                uploadMode = state.settings.uploadMode.wire
+            )
 
             // 控制按钮
             Row(
