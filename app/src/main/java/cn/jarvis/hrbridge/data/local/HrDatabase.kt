@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [HrRecordEntity::class, DeviceEntity::class],
-    version = 1,
+    entities = [HrRecordEntity::class, DeviceEntity::class, SensorRecordEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class HrDatabase : RoomDatabase() {
     abstract fun hrDao(): HrDao
     abstract fun deviceDao(): DeviceDao
+    abstract fun sensorDao(): SensorDao
 
     companion object {
         private const val DB_NAME = "hr_bridge.db"
