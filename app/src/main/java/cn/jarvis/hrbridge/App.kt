@@ -40,11 +40,23 @@ class App : Application() {
                 enableLights(true)
             }
         )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_SENSOR_ALERT,
+                "传感器告警",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                enableVibration(true)
+                enableLights(true)
+                description = "跌倒、久坐、围栏等传感器告警"
+            }
+        )
     }
 
     companion object {
         const val CHANNEL_SERVICE = "hrbridge_service"
         const val CHANNEL_ALERT = "hrbridge_alert"
+        const val CHANNEL_SENSOR_ALERT = "hrbridge_sensor_alert"
 
         lateinit var instance: App
             private set
