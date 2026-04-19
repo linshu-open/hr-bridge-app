@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import cn.jarvis.hrbridge.ServiceLocator
 import cn.jarvis.hrbridge.data.prefs.AppSettings
 import cn.jarvis.hrbridge.ota.Updater
+import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.util.HrThresholds
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +54,15 @@ class SettingsViewModel : ViewModel() {
     fun setUploadInterval(sec: Int)        = viewModelScope.launch { store.setUploadInterval(sec) }
     fun setQuietHours(start: Int, end: Int)= viewModelScope.launch { store.setQuietHours(start, end) }
     fun setThresholds(t: HrThresholds)     = viewModelScope.launch { store.setThresholds(t) }
+
+    // ---- Sensor Bridge 2.0 ----
+    fun setSensorBaseUrl(url: String)          = viewModelScope.launch { store.setSensorBaseUrl(url.trim()) }
+    fun setEnabledSensors(set: Set<String>)    = viewModelScope.launch { store.setEnabledSensors(set) }
+    fun setUploadMode(mode: UploadMode)        = viewModelScope.launch { store.setUploadMode(mode) }
+    fun setHomeLocation(lat: Float, lng: Float)= viewModelScope.launch { store.setHomeLocation(lat, lng) }
+    fun setOfficeLocation(lat: Float, lng: Float)= viewModelScope.launch { store.setOfficeLocation(lat, lng) }
+    fun setRetainDays(days: Int)               = viewModelScope.launch { store.setRetainDays(days) }
+    fun setSedentaryAlertMin(min: Int)         = viewModelScope.launch { store.setSedentaryAlertMin(min) }
 
     fun checkUpdate() {
         viewModelScope.launch {
