@@ -23,11 +23,14 @@ import java.util.concurrent.TimeUnit
 class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
-        val repo = ServiceLocator.hrRepository
+        val hrRepo = ServiceLocator.hrRepository
+        val sensorRepo = ServiceLocator.sensorRepository
         return try {
-            val n = repo.flushBatch(maxBatch = 50)
-            Logger.i("UploadWorker", "上传 $n 条")
-            repo.runMaintenance()
+            val hrN = hrRepo.flushBatch(maxBatch = 50)
+            val sensorN = sensorRepo.flushPending(maxBatch = 80)
+            Logger.i("UploadWorker", "上传 HR=$hrN sensor=$sensorN")
+            hrRepo.runMaintenance()
+            sensorRepo.runMaintenance()
             Result.success()
         } catch (e: Exception) {
             Logger.w("UploadWorker", "上传出错: ${e.message}")
