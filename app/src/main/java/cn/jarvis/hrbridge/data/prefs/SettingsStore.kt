@@ -5,10 +5,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import cn.jarvis.hrbridge.BuildConfig
+import cn.jarvis.hrbridge.sensors.SensorType
+import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.util.HrThresholds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -35,6 +39,17 @@ data class AppSettings(
     val autoReconnect: Boolean = true,
     val dynamicColor: Boolean = true,
     val darkTheme: Int = DARK_SYSTEM,
+
+    // ---- Sensor Bridge 2.0 扩展 ----
+    val sensorBaseUrl: String = BuildConfig.DEFAULT_SENSOR_BASE_URL,
+    val enabledSensors: Set<String> = SensorType.DEFAULT_ENABLED,
+    val uploadMode: UploadMode = UploadMode.NORMAL,
+    val homeLat: Float = 0f,
+    val homeLng: Float = 0f,
+    val officeLat: Float = 0f,
+    val officeLng: Float = 0f,
+    val retainDays: Int = 7,
+    val sedentaryAlertMin: Int = 120,
 
     val migratedFromV1: Boolean = false
 ) {
@@ -70,6 +85,17 @@ class SettingsStore(private val ctx: Context) {
         val DARK_THEME   = intPreferencesKey("dark_theme")
 
         val MIGRATED_V1  = booleanPreferencesKey("migrated_from_v1")
+
+        // Sensor Bridge 2.0
+        val SENSOR_BASE_URL   = stringPreferencesKey("sensor_base_url")
+        val ENABLED_SENSORS   = stringSetPreferencesKey("enabled_sensors")
+        val UPLOAD_MODE       = stringPreferencesKey("upload_mode")
+        val HOME_LAT          = floatPreferencesKey("home_lat")
+        val HOME_LNG          = floatPreferencesKey("home_lng")
+        val OFFICE_LAT        = floatPreferencesKey("office_lat")
+        val OFFICE_LNG        = floatPreferencesKey("office_lng")
+        val RETAIN_DAYS       = intPreferencesKey("retain_days")
+        val SEDENTARY_MIN     = intPreferencesKey("sedentary_alert_min")
     }
 
     val settings: Flow<AppSettings> = ctx.dataStore.data
@@ -95,6 +121,15 @@ class SettingsStore(private val ctx: Context) {
                 autoReconnect     = p[Keys.AUTO_RECONN]  ?: true,
                 dynamicColor     = p[Keys.DYNAMIC_COLOR] ?: true,
                 darkTheme         = p[Keys.DARK_THEME]   ?: AppSettings.DARK_SYSTEM,
+                sensorBaseUrl     = p[Keys.SENSOR_BASE_URL] ?: BuildConfig.DEFAULT_SENSOR_BASE_URL,
+                enabledSensors    = p[Keys.ENABLED_SENSORS] ?: SensorType.DEFAULT_ENABLED,
+                uploadMode        = UploadMode.of(p[Keys.UPLOAD_MODE]),
+                homeLat           = p[Keys.HOME_LAT]     ?: 0f,
+                homeLng           = p[Keys.HOME_LNG]     ?: 0f,
+                officeLat         = p[Keys.OFFICE_LAT]   ?: 0f,
+                officeLng         = p[Keys.OFFICE_LNG]   ?: 0f,
+                retainDays        = p[Keys.RETAIN_DAYS]  ?: 7,
+                sedentaryAlertMin = p[Keys.SEDENTARY_MIN] ?: 120,
                 migratedFromV1    = p[Keys.MIGRATED_V1]  ?: false
             )
         }
@@ -126,6 +161,19 @@ class SettingsStore(private val ctx: Context) {
     suspend fun setDynamicColor(on: Boolean)   = edit { it[Keys.DYNAMIC_COLOR] = on }
     suspend fun setDarkTheme(mode: Int)        = edit { it[Keys.DARK_THEME] = mode }
     suspend fun markMigrated()                 = edit { it[Keys.MIGRATED_V1] = true }
+
+    // ---- Sensor Bridge 2.0 setters ----
+    suspend fun setSensorBaseUrl(url: String) = edit { it[Keys.SENSOR_BASE_URL] = url }
+    suspend fun setEnabledSensors(set: Set<String>) = edit { it[Keys.ENABLED_SENSORS] = set }
+    suspend fun setUploadMode(mode: UploadMode) = edit { it[Keys.UPLOAD_MODE] = mode.wire }
+    suspend fun setHomeLocation(lat: Float, lng: Float) = edit {
+        it[Keys.HOME_LAT] = lat; it[Keys.HOME_LNG] = lng
+    }
+    suspend fun setOfficeLocation(lat: Float, lng: Float) = edit {
+        it[Keys.OFFICE_LAT] = lat; it[Keys.OFFICE_LNG] = lng
+    }
+    suspend fun setRetainDays(days: Int) = edit { it[Keys.RETAIN_DAYS] = days }
+    suspend fun setSedentaryAlertMin(min: Int) = edit { it[Keys.SEDENTARY_MIN] = min }
 
     private suspend inline fun edit(crossinline block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         ctx.dataStore.edit { block(it) }
