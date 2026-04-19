@@ -55,4 +55,21 @@ object NotifyHelper {
             .setContentIntent(pending)
             .build()
     }
+
+    fun sensorAlertNotification(ctx: Context, title: String, message: String): Notification {
+        val pending = PendingIntent.getActivity(
+            ctx, 2,
+            Intent(ctx, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(ctx, App.CHANNEL_SENSOR_ALERT)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .build()
+    }
 }
