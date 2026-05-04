@@ -30,6 +30,17 @@ class JarvisApi(
     suspend fun uploadBatch(url: String, body: HrBatchRequest): Result<JarvisResponse> =
         post(url, batchAdapter.toJson(body.copy(count = body.samples.size)))
 
+    /**
+     * 通用传感器上传端点：`POST {baseUrl}/{type}`
+     * @param baseUrl 例如 http://100.126.107.40:18890/jarvis/sensor（无尾斜杠）
+     * @param type    sensor_type（step_count/location/accelerometer/...）
+     * @param json    已经序列化好的 JSON body
+     */
+    suspend fun postSensor(baseUrl: String, type: String, json: String): Result<JarvisResponse> {
+        val url = baseUrl.trimEnd('/') + "/" + type
+        return post(url, json)
+    }
+
     private suspend fun post(url: String, json: String): Result<JarvisResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val req = Request.Builder()

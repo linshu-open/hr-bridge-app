@@ -5,16 +5,26 @@
     <!-- ========== 蓝牙（minSdk 26 起兼顾 Android 12+ 新权限） ========== -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s"/>
 
+    <!-- ========== 位置（Sensor Bridge 2.0：GPS Collector） ========== -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+
+    <!-- ========== 传感器（加速度/陀螺仪/计步器高采样） ========== -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"/>
+
     <!-- ========== 前台服务 ========== -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:targetApi="34"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" tools:targetApi="34"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:targetApi="34"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <!-- ========== 通知 & 网络 ========== -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -30,8 +40,13 @@
     <!-- ========== OTA 安装（仅限 APP 内） ========== -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
-    <!-- 声明 BLE 为硬件特性（required=false，允许老设备下载） -->
+    <!-- 声明硬件特性（全部 required=false，允许缺失传感器的设备下载） -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false"/>
+    <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false"/>
+    <uses-feature android:name="android.hardware.sensor.light" android:required="false"/>
+    <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
 
     <application
         android:name=".App"
@@ -60,11 +75,11 @@
             </intent-filter>
         </activity>
 
-        <!-- 前台服务：BLE 连接 + 心率监测 -->
+        <!-- 前台服务：BLE 连接 + 心率监测 + 手机传感器 Hub -->
         <service
             android:name=".service.HeartRateService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|health"/>
+            android:foregroundServiceType="connectedDevice|health|location"/>
 
         <!-- 开机自启 -->
         <receiver

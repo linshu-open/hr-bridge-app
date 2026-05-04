@@ -30,6 +30,7 @@ android {
         // 版本信息注入（BuildConfig 可用）
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://100.126.107.40:18890/jarvis/sensor/heart-rate\"")
         buildConfigField("String", "DEFAULT_BATCH_URL",  "\"http://100.126.107.40:18890/jarvis/sensor/heart-rate/batch\"")
+        buildConfigField("String", "DEFAULT_SENSOR_BASE_URL", "\"http://100.126.107.40:18890/jarvis/sensor\"")
         buildConfigField("String", "GITHUB_RELEASES_API","\"https://api.github.com/repos/linshu-open/hr-bridge-app/releases/latest\"")
     }
 
@@ -130,6 +131,7 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
+    implementation(libs.okhttp.sse)
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
     kapt(libs.moshi.codegen)

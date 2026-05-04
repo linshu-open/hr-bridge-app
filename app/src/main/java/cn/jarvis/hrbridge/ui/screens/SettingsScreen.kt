@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.jarvis.hrbridge.BuildConfig
+import cn.jarvis.hrbridge.sensors.SensorType
+import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.util.HrThresholds
 
 @Composable
@@ -93,6 +95,85 @@ fun SettingsScreen(
                 onClick = { vm.setThresholds(HrThresholds.DEFAULT) },
                 modifier = Modifier.align(Alignment.End)
             ) { Text("恢复默认") }
+
+            SectionHeader("传感器桥接")
+
+            var sensorBaseUrl by remember(s.sensorBaseUrl) { mutableStateOf(s.sensorBaseUrl) }
+            OutlinedTextField(
+                value = sensorBaseUrl,
+                onValueChange = { sensorBaseUrl = it },
+                label = { Text("传感器上传 URL") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    TextButton(onClick = { vm.setSensorBaseUrl(sensorBaseUrl) }) { Text("保存") }
+                }
+            )
+
+            Text("启用传感器", style = MaterialTheme.typography.bodyLarge)
+            SensorType.GENERIC.forEach { type ->
+                val label = SensorType.DISPLAY_NAMES[type] ?: type
+                SwitchRow(
+                    title = label,
+                    subtitle = type,
+                    checked = type in s.enabledSensors,
+                    onChange = { on ->
+                        val next = if (on) s.enabledSensors + type else s.enabledSensors - type
+                        vm.setEnabledSensors(next)
+                    }
+                )
+            }
+
+            Text("上传模式", style = MaterialTheme.typography.bodyLarge)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                UploadMode.values().forEach { mode ->
+                    FilterChip(
+                        selected = s.uploadMode == mode,
+                        onClick = { vm.setUploadMode(mode) },
+                        label = { Text(mode.wire) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            SectionHeader("地理围栏")
+            var homeLat by remember(s.homeLat) { mutableStateOf(s.homeLat.toString()) }
+            var homeLng by remember(s.homeLng) { mutableStateOf(s.homeLng.toString()) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = homeLat, onValueChange = { homeLat = it },
+                    label = { Text("家 纬度") }, modifier = Modifier.weight(1f), singleLine = true
+                )
+                OutlinedTextField(
+                    value = homeLng, onValueChange = { homeLng = it },
+                    label = { Text("家 经度") }, modifier = Modifier.weight(1f), singleLine = true
+                )
+                TextButton(onClick = {
+                    vm.setHomeLocation(homeLat.toFloatOrNull() ?: 0f, homeLng.toFloatOrNull() ?: 0f)
+                }) { Text("保存") }
+            }
+            var offLat by remember(s.officeLat) { mutableStateOf(s.officeLat.toString()) }
+            var offLng by remember(s.officeLng) { mutableStateOf(s.officeLng.toString()) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = offLat, onValueChange = { offLat = it },
+                    label = { Text("公司 纬度") }, modifier = Modifier.weight(1f), singleLine = true
+                )
+                OutlinedTextField(
+                    value = offLng, onValueChange = { offLng = it },
+                    label = { Text("公司 经度") }, modifier = Modifier.weight(1f), singleLine = true
+                )
+                TextButton(onClick = {
+                    vm.setOfficeLocation(offLat.toFloatOrNull() ?: 0f, offLng.toFloatOrNull() ?: 0f)
+                }) { Text("保存") }
+            }
+
+            SectionHeader("数据与告警")
+            ThresholdRow("数据保留(天)", s.retainDays, 1..90) { vm.setRetainDays(it) }
+            ThresholdRow("久坐提醒(分钟)", s.sedentaryAlertMin, 30..300) { vm.setSedentaryAlertMin(it) }
 
             SectionHeader("行为")
             SwitchRow("自动重连", "断线后指数退避重连", s.autoReconnect, vm::setAutoReconnect)
