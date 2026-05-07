@@ -93,7 +93,6 @@
             </intent-filter>
         </receiver>
 
-
         <!-- OTA APK 下载后的 FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"

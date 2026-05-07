@@ -184,20 +184,11 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
             .onFailure { Logger.w("Accel", "emit failed: ${it.message}") }
     }
 
-    /**
-     * 活动分类（基于加速度 magnitude 物理意义）。
-     *
-     * 手机静止时 magnitude ≈ 9.8 m/s²（纯重力加速度）。
-     * 9.8 ± 噪声 = 8.5~11.5 → still
-     * 走路波动 11.5~14 → walking
-     * 跑步振动 14~20 → running
-     * 自由落体 ≈ 0 → 设备掉落/关机
-     */
+    /** classify based on physics: 9.8m/s² = gravity = still */
     private fun classifyActivity(mag: Float): String = when {
-        mag < 0.5f   -> "still"        // 自由落体/关机
-        mag < 8.5f   -> "standing"     // 轻微加速度（拿在手里晃）
-        mag <= 11.5f -> "still"        // 9.8±噪声 = 静止(桌面/口袋)
-        mag < 14f    -> "walking"      // 走路步态摆动
+        mag < 0.5f   -> "still"
+        mag <= 11.5f -> "still"        // gravity ± noise
+        mag < 14f    -> "walking"
         mag < 20f    -> "running"
         else         -> "vigorous"
     }

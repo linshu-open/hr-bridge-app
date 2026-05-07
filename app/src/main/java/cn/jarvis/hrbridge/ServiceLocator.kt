@@ -8,7 +8,6 @@ import cn.jarvis.hrbridge.data.prefs.LegacyMigration
 import cn.jarvis.hrbridge.data.prefs.SettingsStore
 import cn.jarvis.hrbridge.data.remote.GithubApi
 import cn.jarvis.hrbridge.data.remote.JarvisApi
-import cn.jarvis.hrbridge.data.remote.McpClient
 import cn.jarvis.hrbridge.data.repo.HrRepository
 import cn.jarvis.hrbridge.sensors.AlertManager
 import cn.jarvis.hrbridge.sensors.SensorHub
@@ -46,7 +45,6 @@ object ServiceLocator {
     lateinit var sensorHub: SensorHub            ; private set
     lateinit var alertManager: AlertManager       ; private set
     lateinit var bleScanner: BleScanner          ; private set
-    lateinit var mcpClient: McpClient            ; private set
     private lateinit var appScope: CoroutineScope
 
     /** 专用给前台服务用；每个 Service 实例独占一个 BleConnection（因为 GATT 是一对一） */
@@ -63,12 +61,11 @@ object ServiceLocator {
         jarvisApi     = JarvisApi()
         githubApi     = GithubApi()
         bleScanner    = BleScanner(appCtx)
-        mcpClient     = McpClient()
 
         val db = HrDatabase.get(appCtx)
         hrRepository = HrRepository(db.hrDao(), jarvisApi, settingsStore)
         alertManager = AlertManager(appCtx)
-        sensorRepository = SensorRepository(db.sensorDao(), jarvisApi, settingsStore, alertManager, mcpClient)
+        sensorRepository = SensorRepository(db.sensorDao(), jarvisApi, settingsStore, alertManager)
 
         // SensorHub 在 Service 中 start；此处只构建依赖关系
         sensorHub = SensorHub(

@@ -19,10 +19,8 @@ import java.util.Calendar
 /**
  * 计步器采集。
  *
- * - SensorManager.TYPE_STEP_COUNTER 返回的是自上次开机以来的累计步数
- * - 每日首次记录 todayOffset = 当前累计值，作为当日基线
- * - 上报 todaySteps = currentSteps - todayOffset（当日净步数）
- * - 跨天自动重设 offset
+ * - SensorManager.TYPE_STEP_COUNTER 返回自上次开机以来的累计步数
+ * - 每日重置偏移：todaySteps = currentSteps - todayOffset（跨天自动重置）
  * - 按 UploadMode 节流：省电 15min / 常规 5min / 实时 1min
  */
 class StepCounterCollector(private val ctx: Context) : SensorCollector {
@@ -33,8 +31,8 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
     private val sensor: Sensor? = sm?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
     private var currentSteps: Int = 0
-    private var todayOffset: Int = -1    // 当日零点的开机累计值，-1=未初始化
-    private var lastOffsetDay: Int = -1  // offset 对应的日期 day-of-year
+    private var todayOffset: Int = -1  // 今日零点的开机累计值
+    private var lastOffsetDay: Int = -1
     private var lastEmitTs: Long = 0L
     private var mode: UploadMode = UploadMode.NORMAL
     private var emitRef: Emit? = null
@@ -45,12 +43,10 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
         override fun onSensorChanged(event: SensorEvent) {
             val steps = event.values[0].toInt()
             currentSteps = steps
-            // 初始化或跨天时重设 offset
             val today = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
             if (todayOffset < 0 || today != lastOffsetDay) {
                 todayOffset = steps
                 lastOffsetDay = today
-                Logger.i("StepCounter", "offset reset: day=$today offset=$todayOffset")
             }
         }
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -109,19 +105,14 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
     }
 
     private suspend fun maybeEmit() {
-        if (todayOffset < 0) return  // 还没读到首值
+        if (todayOffset < 0) return
         val emit = emitRef ?: return
         val now = System.currentTimeMillis() / 1000
-        if (now - lastEmitTs < intervalMs() / 1000 - 5) return  // 防抖
+        if (now - lastEmitTs < intervalMs() / 1000 - 5) return
         lastEmitTs = now
-
-        // 检查是否跨天，跨天则重设 offset
+        // 跨天重设偏移
         val today = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
-        if (today != lastOffsetDay) {
-            todayOffset = currentSteps
-            lastOffsetDay = today
-        }
-
+        if (today != lastOffsetDay) { todayOffset = currentSteps; lastOffsetDay = today }
         val todaySteps = (currentSteps - todayOffset).coerceAtLeast(0)
         val json = """{"steps":$todaySteps,"raw_counter":$currentSteps,"ts":$now}"""
         runCatching { emit(SensorType.STEP_COUNT, json) }

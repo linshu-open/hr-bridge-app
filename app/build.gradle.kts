@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.parcelize)
 }
 
-// ---- Release signing from environment; fallback to debug signing locally ----
+// ---- 从环境变量读取签名（CI 使用）；本地缺失时 fallback 到 debug 签名 ----
 val releaseStoreFile = System.getenv("KEYSTORE_PATH")?.let(::file)
     ?: rootProject.file("app/release.keystore").takeIf { it.exists() }
 val releaseStorePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -27,10 +27,10 @@ android {
 
         vectorDrawables { useSupportLibrary = true }
 
-        // Version config for JARVIS MCP domain reverse proxy.
-        buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://jarvis.qidizw.com/mcp/api/sensor/upload\"")
-        buildConfigField("String", "DEFAULT_BATCH_URL",  "\"https://jarvis.qidizw.com/mcp/api/sensor/upload\"")
-        buildConfigField("String", "DEFAULT_SENSOR_BASE_URL", "\"https://jarvis.qidizw.com/mcp/api/sensor\"")
+        // 版本信息注入（BuildConfig 可用）
+        buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://100.126.107.40:18890/jarvis/sensor/heart-rate\"")
+        buildConfigField("String", "DEFAULT_BATCH_URL",  "\"http://100.126.107.40:18890/jarvis/sensor/heart-rate/batch\"")
+        buildConfigField("String", "DEFAULT_SENSOR_BASE_URL", "\"http://100.126.107.40:18890/jarvis/sensor\"")
         buildConfigField("String", "GITHUB_RELEASES_API","\"https://api.github.com/repos/linshu-open/hr-bridge-app/releases/latest\"")
     }
 
@@ -52,10 +52,10 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            // Use release signing when configured, otherwise fallback to debug for local builds.
+            isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // 闁?release 缂佹稒鍎抽幃鏇犱焊鏉堚晜鏆?release闁挎稑鑻幆渚€宕?fallback 闁?debug闁挎稑鐗婂﹢浼村捶閻楀牏鈧垰顕欐潪鎵憹濞村吋鑹鹃妵鎴犳嫻閵夘垳绀?
+            // 有 release 签名就用 release，否则 fallback 到 debug（本地构建不会失败）
             signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
@@ -131,7 +131,6 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
-    implementation(libs.okhttp.sse)
     implementation(libs.moshi)
     implementation(libs.moshi.kotlin)
     kapt(libs.moshi.codegen)
@@ -147,4 +146,3 @@ dependencies {
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.espresso)
 }
-
