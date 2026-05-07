@@ -41,9 +41,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.7'
+          cache-read-only: false
 
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon
+        run: gradle assembleDebug --stacktrace --no-daemon --no-build-cache
 
       - name: Build Release APK (fallback to debug signing)
         env:
