@@ -8,6 +8,10 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,21 +23,36 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: gradle
 
-      - name: Setup Gradle
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew || true
+
+      - name: Decode release keystore (optional)
+        id: keystore
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+          echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.7'
 
-      - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.7
-
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon --info 2>&1 | tail -200
+        run: gradle assembleDebug --stacktrace --no-daemon
 
       - name: Build Release APK
-        run: ./gradlew :app:assembleRelease --stacktrace --no-daemon
-        continue-on-error: true
+        if: ${{ steps.keystore.outputs.has_keystore == 'true' }}
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease --stacktrace --no-daemon
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -43,6 +62,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Release APK
+        if: ${{ steps.keystore.outputs.has_keystore == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release
@@ -63,9 +83,8 @@ jobs:
           name: app-release
           path: ./artifact
 
-      - name: Download debug APK as fallback
+      - uses: actions/download-artifact@v4
         if: ${{ steps.dl-release.outcome == 'failure' }}
-        uses: actions/download-artifact@v4
         with:
           name: app-debug
           path: ./artifact
