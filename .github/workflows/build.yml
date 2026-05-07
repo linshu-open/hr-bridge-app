@@ -23,36 +23,26 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew || true
 
-      - name: Decode release keystore (optional)
-        id: keystore
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
-          echo "has_keystore=true" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Gradle 8.7
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.7'
-          cache-read-only: false
-
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon --no-build-cache
+        run: ./gradlew assembleDebug --stacktrace --no-daemon --no-build-cache 2>&1 || gradle assembleDebug --stacktrace --no-daemon --no-build-cache
 
       - name: Build Release APK (fallback to debug signing)
         env:
-          KEYSTORE_PATH: ${{ steps.keystore.outputs.has_keystore == 'true' && format('{0}/app/release.keystore', github.workspace) || '' }}
+          KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH != '' && format('{0}/app/release.keystore', github.workspace) || '' }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle assembleRelease --stacktrace --no-daemon
+        run: |
+          if [ -n "$KEYSTORE_PATH" ] && [ -f "$KEYSTORE_PATH" ]; then
+            ./gradlew assembleRelease --stacktrace || gradle assembleRelease --stacktrace
+          else
+            echo "No release keystore; building release with debug signing"
+            ./gradlew assembleRelease --stacktrace || gradle assembleRelease --stacktrace
+          fi
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
