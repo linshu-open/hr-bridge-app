@@ -99,6 +99,12 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         startTimer()
     }
 
+    override fun syncNow(): Boolean {
+        val scope = scopeRef ?: return false
+        scope.launch { maybeEmit() }
+        return true
+    }
+
     private suspend fun maybeEmit() {
         val emit = emitRef ?: return
         val ts = System.currentTimeMillis() / 1000

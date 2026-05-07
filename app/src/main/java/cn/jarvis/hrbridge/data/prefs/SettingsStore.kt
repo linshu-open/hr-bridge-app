@@ -22,6 +22,11 @@ import java.io.IOException
 /** 单例 DataStore（绑定到应用上下文） */
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
+private fun normalizeJarvisUrl(url: String, fallback: String): String {
+    if (url.isBlank()) return fallback
+    return url
+}
+
 /** 应用设置模型 */
 data class AppSettings(
     val selectedDeviceName: String = "",
@@ -104,8 +109,8 @@ class SettingsStore(private val ctx: Context) {
             AppSettings(
                 selectedDeviceName = p[Keys.DEVICE_NAME] ?: "",
                 selectedDeviceMac  = p[Keys.DEVICE_MAC]  ?: "",
-                serverUrl          = p[Keys.SERVER_URL]  ?: BuildConfig.DEFAULT_SERVER_URL,
-                batchUrl           = p[Keys.BATCH_URL]   ?: BuildConfig.DEFAULT_BATCH_URL,
+                serverUrl          = normalizeJarvisUrl(p[Keys.SERVER_URL] ?: BuildConfig.DEFAULT_SERVER_URL, BuildConfig.DEFAULT_SERVER_URL),
+                batchUrl           = normalizeJarvisUrl(p[Keys.BATCH_URL] ?: BuildConfig.DEFAULT_BATCH_URL, BuildConfig.DEFAULT_BATCH_URL),
                 authToken          = p[Keys.TOKEN]       ?: "",
                 thresholds = HrThresholds(
                     criticalLow  = p[Keys.TH_CRIT_LOW] ?: 50,
@@ -121,7 +126,7 @@ class SettingsStore(private val ctx: Context) {
                 autoReconnect     = p[Keys.AUTO_RECONN]  ?: true,
                 dynamicColor     = p[Keys.DYNAMIC_COLOR] ?: true,
                 darkTheme         = p[Keys.DARK_THEME]   ?: AppSettings.DARK_SYSTEM,
-                sensorBaseUrl     = p[Keys.SENSOR_BASE_URL] ?: BuildConfig.DEFAULT_SENSOR_BASE_URL,
+                sensorBaseUrl     = normalizeJarvisUrl(p[Keys.SENSOR_BASE_URL] ?: BuildConfig.DEFAULT_SENSOR_BASE_URL, BuildConfig.DEFAULT_SENSOR_BASE_URL),
                 enabledSensors    = p[Keys.ENABLED_SENSORS] ?: SensorType.DEFAULT_ENABLED,
                 uploadMode        = UploadMode.of(p[Keys.UPLOAD_MODE]),
                 homeLat           = p[Keys.HOME_LAT]     ?: 0f,

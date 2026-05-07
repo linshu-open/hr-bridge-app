@@ -60,4 +60,14 @@ class SensorHub(
     }
 
     fun runningTypes(): Set<String> = running.toSet()
+
+    /** AlarmManager 唤醒时强制所有运行中的 Collector 立即 emit */
+    fun syncAll() {
+        for (c in collectors) {
+            if (c.type in running) {
+                runCatching { c.syncNow() }
+                    .onFailure { Logger.w("SensorHub", "syncNow ${c.type} failed: ${it.message}") }
+            }
+        }
+    }
 }

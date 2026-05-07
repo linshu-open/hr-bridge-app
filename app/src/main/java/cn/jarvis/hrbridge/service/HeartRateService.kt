@@ -75,6 +75,9 @@ class HeartRateService : LifecycleService() {
                 ServiceLocator.alertManager.start(lifecycleScope)
             }.onFailure { Logger.w("HRService", "SensorHub start failed: ${it.message}") }
 
+            // 注册 AlarmManager 后台保活（Doze 模式下也能唤醒采集）
+            SensorAlarmReceiver.schedule(this@HeartRateService)
+
             if (currentDeviceMac.isEmpty()) {
                 Logger.w("HRService", "未配置手环 MAC；仅运行手机传感器")
             } else {
@@ -211,6 +214,7 @@ class HeartRateService : LifecycleService() {
     override fun onDestroy() {
         reconnectJob?.cancel()
         realtimeModeJob?.cancel()
+        SensorAlarmReceiver.cancel(this)
         connection.disconnect()
         runCatching { ServiceLocator.alertManager.stop() }
         runCatching { ServiceLocator.sensorHub.stop() }

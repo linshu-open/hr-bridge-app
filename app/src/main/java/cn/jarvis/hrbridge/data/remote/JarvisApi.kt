@@ -31,14 +31,25 @@ class JarvisApi(
         post(url, batchAdapter.toJson(body.copy(count = body.samples.size)))
 
     /**
-     * 通用传感器上传端点：`POST {baseUrl}/{type}`
-     * @param baseUrl 例如 http://100.126.107.40:18890/jarvis/sensor（无尾斜杠）
+     * 通用传感器上传端点
+     * 新API: POST /api/sensor/upload
+     * Body: {"sensor_type":"xxx","device_id":"android-phone","values":{...}}
+     *
+     * @param baseUrl 例如 http://114.132.201.207:3001/api/sensor（无尾斜杠）
      * @param type    sensor_type（step_count/location/accelerometer/...）
-     * @param json    已经序列化好的 JSON body
+     * @param json    已经序列化好的 JSON body（原始数据）
      */
     suspend fun postSensor(baseUrl: String, type: String, json: String): Result<JarvisResponse> {
-        val url = baseUrl.trimEnd('/') + "/" + type
-        return post(url, json)
+        // 新API格式：包装成 {"sensor_type":"xxx","device_id":"...","values":{...}}
+        val wrappedJson = buildString {
+            append("{\"sensor_type\":\"")
+            append(type)
+            append("\",\"device_id\":\"android-phone-001\",\"values\":")
+            append(json)
+            append("}")
+        }
+        val url = baseUrl.trimEnd('/') + "/upload"
+        return post(url, wrappedJson)
     }
 
     private suspend fun post(url: String, json: String): Result<JarvisResponse> = withContext(Dispatchers.IO) {
