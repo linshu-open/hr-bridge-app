@@ -24,11 +24,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew || true
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+          cache-disabled: true
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon --no-build-cache 2>&1 || gradle assembleDebug --stacktrace --no-daemon --no-build-cache
+        run: gradle assembleDebug --stacktrace --no-daemon --no-build-cache
 
       - name: Build Release APK (fallback to debug signing)
         env:
@@ -38,10 +41,10 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_PATH" ] && [ -f "$KEYSTORE_PATH" ]; then
-            ./gradlew assembleRelease --stacktrace || gradle assembleRelease --stacktrace
+            gradle assembleRelease --stacktrace --no-daemon
           else
             echo "No release keystore; building release with debug signing"
-            ./gradlew assembleRelease --stacktrace || gradle assembleRelease --stacktrace
+            gradle assembleRelease --stacktrace --no-daemon
           fi
 
       - name: Upload Debug APK
