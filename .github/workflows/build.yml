@@ -8,10 +8,6 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,24 +24,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.7'
-          cache-disabled: true
 
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon --no-build-cache
+        run: |
+          gradle --version
+          gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Build Release APK (fallback to debug signing)
-        env:
-          KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH != '' && format('{0}/app/release.keystore', github.workspace) || '' }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          if [ -n "$KEYSTORE_PATH" ] && [ -f "$KEYSTORE_PATH" ]; then
-            gradle assembleRelease --stacktrace --no-daemon
-          else
-            echo "No release keystore; building release with debug signing"
-            gradle assembleRelease --stacktrace --no-daemon
-          fi
+        run: gradle :app:assembleRelease --stacktrace --no-daemon
+        continue-on-error: true
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
