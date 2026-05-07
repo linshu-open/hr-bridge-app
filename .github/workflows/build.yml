@@ -45,10 +45,9 @@ jobs:
       - name: Build Debug APK
         run: gradle assembleDebug --stacktrace --no-daemon
 
-      - name: Build Release APK
-        if: ${{ steps.keystore.outputs.has_keystore == 'true' }}
+      - name: Build Release APK (fallback to debug signing)
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
+          KEYSTORE_PATH: ${{ steps.keystore.outputs.has_keystore == 'true' && format('{0}/app/release.keystore', github.workspace) || '' }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -62,7 +61,6 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Release APK
-        if: ${{ steps.keystore.outputs.has_keystore == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: app-release
@@ -76,15 +74,36 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download release APK (or fallback to debug)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        id: dl-release
         with:
           name: app-release
           path: ./artifact
 
+      - name: Download debug APK as fallback
+        if: ${{ steps.dl-release.outcome == 'failure' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: app-debug
+          path: ./artifact
+
+      - name: Determine APK filename
+        id: apk-file
+        run: |
+          if [ -f ./artifact/app-release.apk ]; then
+            echo "apk=app-release.apk" >> "$GITHUB_OUTPUT"
+          elif [ -f ./artifact/app-debug.apk ]; then
+            echo "apk=app-debug.apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "No APK found!" && ls -la ./artifact/ && exit 1
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ./artifact/app-release.apk
+          files: ./artifact/${{ steps.apk-file.outputs.apk }}
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
