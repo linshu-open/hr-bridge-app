@@ -93,11 +93,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Doze 模式传感器采集保活 -->
-        <receiver
-            android:name=".service.SensorAlarmReceiver"
-            android:exported="false"
-            android:enabled="true"/>
 
         <!-- OTA APK 下载后的 FileProvider -->
         <provider

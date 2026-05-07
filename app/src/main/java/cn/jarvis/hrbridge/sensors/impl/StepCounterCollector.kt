@@ -108,12 +108,6 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
         startTimer()
     }
 
-    override fun syncNow(): Boolean {
-        val scope = scopeRef ?: return false
-        scope.launch { maybeEmit() }
-        return true
-    }
-
     private suspend fun maybeEmit() {
         if (todayOffset < 0) return  // 还没读到首值
         val emit = emitRef ?: return

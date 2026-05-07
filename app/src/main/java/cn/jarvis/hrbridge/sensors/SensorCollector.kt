@@ -27,11 +27,4 @@ interface SensorCollector {
 
     /** 当前是否可用（硬件存在且权限具备） */
     fun isAvailable(): Boolean = true
-
-    /**
-     * AlarmManager 唤醒时手动触发立即采集。
-     * 对协程 timer 类型的 Collector（Light/Accel/Gyro），直接执行 maybeEmit()。
-     * 对事件驱动类型的 Collector（Location/Bluetooth），不做干预。
-     */
-    fun syncNow(): Boolean = false
 }

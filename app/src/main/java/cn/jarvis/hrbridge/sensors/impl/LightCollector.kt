@@ -61,14 +61,6 @@ class LightCollector(private val ctx: Context) : SensorCollector {
         Logger.i("Light", "stopped")
     }
 
-    override fun syncNow(): Boolean {
-        val lux = lastEmittedLux
-        if (lux < 0f) return false
-        val scope = scopeRef ?: return false
-        scope.launch { doEmit(lux) }
-        return true
-    }
-
     private suspend fun doEmit(lux: Float) {
         val emit = emitRef ?: return
         val ts = System.currentTimeMillis() / 1000
