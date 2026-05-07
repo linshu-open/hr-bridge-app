@@ -25,13 +25,14 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build Debug APK
-        run: |
-          gradle --version
-          gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.7
 
-      - name: Build Release APK (fallback to debug signing)
-        run: gradle :app:assembleRelease --stacktrace --no-daemon
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon --info 2>&1 | tail -200
+
+      - name: Build Release APK
+        run: ./gradlew :app:assembleRelease --stacktrace --no-daemon
         continue-on-error: true
 
       - name: Upload Debug APK
@@ -55,8 +56,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download release APK (or fallback to debug)
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         continue-on-error: true
         id: dl-release
         with:
