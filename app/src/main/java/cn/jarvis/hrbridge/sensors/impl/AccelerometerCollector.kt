@@ -185,9 +185,11 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
     }
 
     private fun classifyActivity(mag: Float): String = when {
-        mag < 2f    -> "still"
-        mag < 12f   -> "walking"
-        mag < 20f   -> "running"
-        else        -> "vigorous"
+        mag < 0.5f -> "still"
+        // A phone lying still reports gravity, about 9.8m/s^2. Treat that band as still.
+        mag <= 11.5f -> "still"
+        mag < 14f -> "walking"
+        mag < 20f -> "running"
+        else -> "vigorous"
     }
 }

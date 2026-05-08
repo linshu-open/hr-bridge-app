@@ -14,14 +14,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /**
- * 计步器采集。
+ * Step counter collector.
  *
- * - SensorManager.TYPE_STEP_COUNTER 返回的是自上次开机以来的累计步数
- * - 首次读到的值作为基准（baseSteps），后续上报 delta 或绝对值均可；
- *   服务端期望的是当日累计，这里上报绝对值，服务端自行计算增量
- * - 按 UploadMode 节流：省电 15min / 常规 5min / 实时 1min
+ * Android TYPE_STEP_COUNTER reports the boot-session accumulated counter, not
+ * today's steps. We persist a daily offset and upload today's delta only.
  */
 class StepCounterCollector(private val ctx: Context) : SensorCollector {
 
@@ -29,9 +28,11 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
 
     private val sm: SensorManager? = ctx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val sensor: Sensor? = sm?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    private val prefs by lazy { ctx.getSharedPreferences("step_counter_daily", Context.MODE_PRIVATE) }
 
     private var currentSteps: Int = 0
-    private var baseSteps: Int = -1   // 首次读到的值，用于判断是否已初始化
+    private var todayOffset: Int = -1
+    private var offsetDay: String = ""
     private var lastEmitTs: Long = 0L
     private var mode: UploadMode = UploadMode.NORMAL
     private var emitRef: Emit? = null
@@ -41,8 +42,8 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             val steps = event.values[0].toInt()
-            if (baseSteps < 0) baseSteps = steps
             currentSteps = steps
+            ensureDailyOffset(steps)
         }
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
@@ -70,12 +71,11 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
         sm?.unregisterListener(listener)
         emitRef = null
         scopeRef = null
-        baseSteps = -1
+        todayOffset = -1
+        offsetDay = ""
         currentSteps = 0
         Logger.i("StepCounter", "stopped")
     }
-
-    // ---- internal ----
 
     private fun intervalMs(): Long = when (mode) {
         UploadMode.POWER_SAVER -> 15 * 60_000L
@@ -99,13 +99,28 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
     }
 
     private suspend fun maybeEmit() {
-        if (baseSteps < 0) return  // 还没读到首值
+        if (todayOffset < 0) return
         val emit = emitRef ?: return
         val now = System.currentTimeMillis() / 1000
-        if (now - lastEmitTs < intervalMs() / 1000 - 5) return  // 防抖
+        if (now - lastEmitTs < intervalMs() / 1000 - 5) return
         lastEmitTs = now
-        val json = """{"steps":$currentSteps,"ts":$now}"""
+        val todaySteps = (currentSteps - todayOffset).coerceAtLeast(0)
+        val json = """{"steps":$todaySteps,"raw_counter":$currentSteps,"offset":$todayOffset,"day":"$offsetDay","ts":$now}"""
         runCatching { emit(SensorType.STEP_COUNT, json) }
             .onFailure { Logger.w("StepCounter", "emit failed: ${it.message}") }
+    }
+
+    private fun ensureDailyOffset(rawSteps: Int) {
+        val today = LocalDate.now().toString()
+        if (todayOffset < 0) {
+            offsetDay = prefs.getString("day", "") ?: ""
+            todayOffset = prefs.getInt("offset", -1)
+        }
+        if (offsetDay != today || todayOffset < 0 || rawSteps < todayOffset) {
+            offsetDay = today
+            todayOffset = rawSteps
+            prefs.edit().putString("day", today).putInt("offset", rawSteps).apply()
+            Logger.i("StepCounter", "daily offset reset day=$today offset=$rawSteps")
+        }
     }
 }

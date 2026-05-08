@@ -11,12 +11,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 开机自启：
- *   - BOOT_COMPLETED: 普通开机
- *   - LOCKED_BOOT_COMPLETED: 直接启动模式（锁屏前）
- *   - MY_PACKAGE_REPLACED: APP 更新后
+ * Auto-start receiver.
  *
- * 仅在用户已配置过设备时才启动。
+ * The sensor bridge must run even when no heart-rate band is selected, because
+ * location / steps / light / motion are still useful JARVIS inputs.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -29,13 +27,9 @@ class BootReceiver : BroadcastReceiver() {
                 CoroutineScope(Dispatchers.Default).launch {
                     try {
                         val s = ServiceLocator.settingsStore.settings.first()
-                        if (s.selectedDeviceMac.isNotEmpty()) {
-                            Logger.i("BootReceiver", "开机自启服务，设备=${s.selectedDeviceName}")
-                            HeartRateService.start(context)
-                            UploadWorker.schedule(context)
-                        } else {
-                            Logger.i("BootReceiver", "未配置设备，跳过自启")
-                        }
+                        Logger.i("BootReceiver", "auto start service, device=${s.selectedDeviceName.ifEmpty { "none" }}")
+                        HeartRateService.start(context)
+                        UploadWorker.schedule(context)
                     } finally {
                         pending.finish()
                     }

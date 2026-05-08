@@ -217,6 +217,12 @@ class HeartRateService : LifecycleService() {
         super.onDestroy()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Logger.w("HRService", "task removed; requesting sticky restart")
+        HeartRateService.start(this)
+    }
+
     override fun onBind(intent: Intent): IBinder? {
         super.onBind(intent)
         return null

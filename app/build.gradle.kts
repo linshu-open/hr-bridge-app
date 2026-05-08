@@ -22,15 +22,15 @@ android {
         applicationId = "cn.jarvis.hrbridge"
         minSdk = 26
         targetSdk = 34
-        versionCode = 20000
-        versionName = "2.0.0-alpha1"
+        versionCode = 20002
+        versionName = "2.0.0-alpha3"
 
         vectorDrawables { useSupportLibrary = true }
 
         // 版本信息注入（BuildConfig 可用）
-        buildConfigField("String", "DEFAULT_SERVER_URL", "\"http://100.126.107.40:18890/jarvis/sensor/heart-rate\"")
-        buildConfigField("String", "DEFAULT_BATCH_URL",  "\"http://100.126.107.40:18890/jarvis/sensor/heart-rate/batch\"")
-        buildConfigField("String", "DEFAULT_SENSOR_BASE_URL", "\"http://100.126.107.40:18890/jarvis/sensor\"")
+        buildConfigField("String", "DEFAULT_SERVER_URL", "\"https://jarvis.qidizw.com/mcp/api/sensor/upload\"")
+        buildConfigField("String", "DEFAULT_BATCH_URL",  "\"https://jarvis.qidizw.com/mcp/api/sensor/upload\"")
+        buildConfigField("String", "DEFAULT_SENSOR_BASE_URL", "\"https://jarvis.qidizw.com/mcp/api/sensor\"")
         buildConfigField("String", "GITHUB_RELEASES_API","\"https://api.github.com/repos/linshu-open/hr-bridge-app/releases/latest\"")
     }
 
