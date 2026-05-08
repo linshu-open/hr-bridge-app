@@ -22,6 +22,7 @@ import cn.jarvis.hrbridge.sensors.impl.StepCounterCollector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -86,8 +87,32 @@ object ServiceLocator {
         // 后台跑一次 v1→v2 迁移 + 维护
         appScope.launch {
             runCatching { LegacyMigration.runIfNeeded(appCtx, settingsStore) }
+            runCatching { ensureCurrentMcpEndpoints() }
             runCatching { hrRepository.runMaintenance() }
             runCatching { sensorRepository.runMaintenance() }
+        }
+    }
+
+    private suspend fun ensureCurrentMcpEndpoints() {
+        val s = settingsStore.settings.first()
+        fun isOldOrUnsafe(url: String): Boolean {
+            val normalized = url.lowercase()
+            return normalized.isBlank() ||
+                normalized.startsWith("http://") ||
+                "100.126.107.40" in normalized ||
+                "114.132.201.207" in normalized ||
+                ":18890" in normalized ||
+                "/jarvis/sensor" in normalized
+        }
+
+        if (isOldOrUnsafe(s.serverUrl)) {
+            settingsStore.setServerUrl(BuildConfig.DEFAULT_SERVER_URL)
+        }
+        if (isOldOrUnsafe(s.batchUrl)) {
+            settingsStore.setBatchUrl(BuildConfig.DEFAULT_BATCH_URL)
+        }
+        if (isOldOrUnsafe(s.sensorBaseUrl) || "/mcp/api/sensor" !in s.sensorBaseUrl) {
+            settingsStore.setSensorBaseUrl(BuildConfig.DEFAULT_SENSOR_BASE_URL)
         }
     }
 }

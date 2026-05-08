@@ -36,6 +36,7 @@ class HeartRateService : LifecycleService() {
     private val backoff = ExponentialBackoff(baseMs = 3_000L, maxAttempts = Int.MAX_VALUE, factor = 3.0)
     private var reconnectJob: Job? = null
     private var realtimeModeJob: Job? = null
+    private var uploadLoopJob: Job? = null
     private var attempt = 0
 
     private val recentHrBuffer = ArrayDeque<Int>()
@@ -74,6 +75,7 @@ class HeartRateService : LifecycleService() {
                 )
                 ServiceLocator.alertManager.start(lifecycleScope)
             }.onFailure { Logger.w("HRService", "SensorHub start failed: ${it.message}") }
+            startUploadLoop()
 
             if (currentDeviceMac.isEmpty()) {
                 Logger.w("HRService", "未配置手环 MAC；仅运行手机传感器")
@@ -91,7 +93,8 @@ class HeartRateService : LifecycleService() {
             startForeground(
                 NotifyHelper.NOTIF_ID_SERVICE, notif,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             )
         } else {
             startForeground(NotifyHelper.NOTIF_ID_SERVICE, notif)
@@ -196,6 +199,25 @@ class HeartRateService : LifecycleService() {
         }
     }
 
+    private fun startUploadLoop() {
+        if (uploadLoopJob?.isActive == true) return
+        uploadLoopJob = lifecycleScope.launch {
+            delay(5_000L)
+            while (true) {
+                val settings = ServiceLocator.settingsStore.settings.first()
+                val intervalMs = settings.uploadIntervalSec.coerceIn(30, 900) * 1000L
+                runCatching {
+                    val hrN = ServiceLocator.hrRepository.flushBatch(maxBatch = 50)
+                    val sensorN = ServiceLocator.sensorRepository.flushPending(maxBatch = 80)
+                    Logger.i("HRService", "foreground flush HR=$hrN sensor=$sensorN")
+                }.onFailure {
+                    Logger.w("HRService", "foreground flush failed: ${it.message}")
+                }
+                delay(intervalMs)
+            }
+        }
+    }
+
     private fun scheduleReconnect() {
         if (reconnectJob?.isActive == true) return
         val delay = backoff.nextDelayMs(attempt) ?: 405_000L
@@ -211,6 +233,7 @@ class HeartRateService : LifecycleService() {
     override fun onDestroy() {
         reconnectJob?.cancel()
         realtimeModeJob?.cancel()
+        uploadLoopJob?.cancel()
         connection.disconnect()
         runCatching { ServiceLocator.alertManager.stop() }
         runCatching { ServiceLocator.sensorHub.stop() }

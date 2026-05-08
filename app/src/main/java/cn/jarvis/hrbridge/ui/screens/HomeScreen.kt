@@ -46,7 +46,7 @@ fun HomeScreen(
     var showPermDeniedDialog by remember { mutableStateOf(false) }
 
     val permRequester = rememberPermissionRequester { granted ->
-        if (granted && state.hasDevice) {
+        if (granted) {
             HeartRateService.start(ctx)
             serviceRunning = true
         } else if (!granted) {
@@ -102,19 +102,15 @@ fun HomeScreen(
             ) {
                 Button(
                     onClick = {
-                        if (!state.hasDevice) {
-                            onScanClick()
-                        } else {
-                            // 启动服务前先确保权限
-                            permRequester.request()
-                        }
+                        // Sensor Bridge can run without a BLE wristband.
+                        permRequester.request()
                     },
                     enabled = !serviceRunning,
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (state.hasDevice) "开始监测" else "选择设备")
+                    Text(if (state.hasDevice) "开始监测" else "启动传感器")
                 }
                 OutlinedButton(
                     onClick = {

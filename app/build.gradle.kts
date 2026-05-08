@@ -22,8 +22,8 @@ android {
         applicationId = "cn.jarvis.hrbridge"
         minSdk = 26
         targetSdk = 34
-        versionCode = 20002
-        versionName = "2.0.0-alpha3"
+        versionCode = 20003
+        versionName = "2.0.0-alpha4"
 
         vectorDrawables { useSupportLibrary = true }
 
