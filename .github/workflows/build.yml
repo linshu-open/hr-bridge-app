@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main, master, 'rewrite/**']
+    branches: [main, master, 'rewrite/**', 'feature/**']
     tags: ['v*']
   pull_request:
     branches: [main, master]
@@ -24,7 +24,6 @@ jobs:
         env:
           GRADLE_OPTS: -Dorg.gradle.caching=false
         run: |
-          gradle wrapper --gradle-version 8.7
           ./gradlew assembleRelease --no-daemon --no-build-cache --stacktrace
 
       - name: Upload APK
