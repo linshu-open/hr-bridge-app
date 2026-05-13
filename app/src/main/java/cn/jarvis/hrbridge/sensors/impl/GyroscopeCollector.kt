@@ -9,6 +9,8 @@ import cn.jarvis.hrbridge.sensors.Emit
 import cn.jarvis.hrbridge.sensors.SensorCollector
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
+import cn.jarvis.hrbridge.sensors.imu.GyroSample
+import cn.jarvis.hrbridge.sensors.imu.ImuWindowAggregator
 import cn.jarvis.hrbridge.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -22,6 +24,7 @@ import kotlin.math.sqrt
  * - SensorManager.TYPE_GYROSCOPE 5Hz
  * - angular_speed = sqrt(x²+y²+z²)；posture 推断(upright|lying|tilted)
  * - 上传频率同加速度计梯度：POWER_SAVER 5min / NORMAL 1min / REALTIME 10s
+ * - M1B: 喂原始样本到 ImuWindowAggregator
  */
 class GyroscopeCollector(private val ctx: Context) : SensorCollector {
 
@@ -40,12 +43,18 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     private var lastZ: Float = 0f
     private var lastAngularSpeed: Float = 0f
 
+    // ---- M1B IMU aggregator ----
+    var aggregator: ImuWindowAggregator? = null
+
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             lastX = event.values[0]
             lastY = event.values[1]
             lastZ = event.values[2]
             lastAngularSpeed = sqrt(lastX * lastX + lastY * lastY + lastZ * lastZ)
+
+            // M1B: feed raw sample to IMU window aggregator
+            aggregator?.addGyro(GyroSample(System.currentTimeMillis(), lastX, lastY, lastZ, lastAngularSpeed))
         }
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }

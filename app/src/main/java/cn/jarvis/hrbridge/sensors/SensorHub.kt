@@ -1,5 +1,6 @@
 package cn.jarvis.hrbridge.sensors
 
+import cn.jarvis.hrbridge.sensors.imu.ImuWindowAggregator
 import cn.jarvis.hrbridge.util.Logger
 import kotlinx.coroutines.CoroutineScope
 
@@ -20,8 +21,13 @@ class SensorHub(
     @Volatile private var currentMode: UploadMode = UploadMode.NORMAL
     private val running: MutableSet<String> = mutableSetOf()
 
+    /** Shared IMU aggregator for cross-sensor windowing (M1B) */
+    @Volatile
+    var imuAggregator: ImuWindowAggregator = ImuWindowAggregator()
+
     fun start(scope: CoroutineScope, enabled: Set<String>, mode: UploadMode) {
         currentMode = mode
+        imuAggregator.applyMode(mode)
         val emit: Emit = { type, json -> repo.ingest(type, json) }
 
         for (c in collectors) {
@@ -38,7 +44,7 @@ class SensorHub(
                     running.remove(c.type)
                     Logger.i("SensorHub", "stop ${c.type}")
                 }
-                /* want == isRunning：不动 */
+                /* want == isRunning */
             }
         }
     }
@@ -46,6 +52,7 @@ class SensorHub(
     fun applyMode(mode: UploadMode) {
         if (mode == currentMode) return
         currentMode = mode
+        imuAggregator.applyMode(mode)
         for (c in collectors) {
             if (c.type in running) runCatching { c.onModeChanged(mode) }
         }

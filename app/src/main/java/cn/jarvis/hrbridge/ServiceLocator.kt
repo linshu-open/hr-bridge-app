@@ -69,18 +69,24 @@ object ServiceLocator {
         sensorRepository = SensorRepository(db.sensorDao(), jarvisApi, settingsStore, alertManager)
 
         // SensorHub 在 Service 中 start；此处只构建依赖关系
+        val accelerometerCollector = AccelerometerCollector(appCtx)
+        val gyroscopeCollector = GyroscopeCollector(appCtx)
         sensorHub = SensorHub(
             collectors = listOf(
                 StepCounterCollector(appCtx),
                 LocationCollector(appCtx),
-                AccelerometerCollector(appCtx),
-                GyroscopeCollector(appCtx),
+                accelerometerCollector,
+                gyroscopeCollector,
                 LightCollector(appCtx),
                 BluetoothStateCollector(appCtx),
                 SleepCollector(appCtx)
             ),
             repo = sensorRepository
         )
+
+        // M1B: wire shared IMU aggregator to accel + gyro collectors
+        accelerometerCollector.aggregator = sensorHub.imuAggregator
+        gyroscopeCollector.aggregator = sensorHub.imuAggregator
 
         appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 

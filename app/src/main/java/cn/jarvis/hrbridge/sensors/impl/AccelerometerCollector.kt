@@ -9,6 +9,9 @@ import cn.jarvis.hrbridge.sensors.Emit
 import cn.jarvis.hrbridge.sensors.SensorCollector
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
+import cn.jarvis.hrbridge.sensors.imu.AccelSample
+import cn.jarvis.hrbridge.sensors.imu.ImuWindowAggregator
+import cn.jarvis.hrbridge.sensors.imu.ImuWindowJson
 import cn.jarvis.hrbridge.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -24,6 +27,7 @@ import kotlin.math.sqrt
  * - 跌倒检测：magnitude 突降 + 静止 → fall_detected = true
  * - 久坐累计：still_duration_min
  * - 上传频率：POWER_SAVER 5min / NORMAL 1min / REALTIME 10s
+ * - M1B: 喂原始样本到 ImuWindowAggregator，poll 完成的 IMU 窗口上传
  */
 class AccelerometerCollector(private val ctx: Context) : SensorCollector {
 
@@ -55,6 +59,10 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
     private var stillSinceMs: Long = System.currentTimeMillis()
     private var currentActivity: String = "still"
 
+    // ---- M1B IMU aggregator ----
+    var aggregator: ImuWindowAggregator? = null
+    private var deviceId: String = "android-phone"
+
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             val x = event.values[0]
@@ -63,6 +71,9 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
             lastX = x; lastY = y; lastZ = z
             val mag = sqrt(x * x + y * y + z * z)
             lastMagnitude = mag
+
+            // M1B: feed raw sample to IMU window aggregator
+            aggregator?.addAccel(AccelSample(System.currentTimeMillis(), x, y, z, mag))
 
             // 跌倒检测：幅值突然大幅下降（从 >15 降到 <5），且随后静止
             if (prevMagnitude > 15f && mag < 5f) {
@@ -182,6 +193,16 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         }
         runCatching { emit(SensorType.ACCELEROMETER, json) }
             .onFailure { Logger.w("Accel", "emit failed: ${it.message}") }
+
+        // M1B: poll completed IMU window and upload
+        val agg = aggregator ?: return
+        val feature = agg.pollCompleted(System.currentTimeMillis())
+        if (feature != null) {
+            val imuJson = ImuWindowJson.toJson(feature, deviceId)
+            runCatching { emit(SensorType.IMU_WINDOW, imuJson) }
+                .onFailure { Logger.w("Accel", "imu_window emit failed: ${it.message}") }
+            agg.clearLocked()
+        }
     }
 
     private fun classifyActivity(mag: Float): String = when {
