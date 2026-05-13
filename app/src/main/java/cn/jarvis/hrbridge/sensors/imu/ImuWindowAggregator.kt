@@ -155,8 +155,8 @@ class ImuWindowAggregator {
         if (inWindow.isEmpty()) return AccelStats.empty()
 
         val n = inWindow.size
-        val mean = inWindow.sum() / n
-        val variance = if (n > 1) inWindow.map { (it - mean) * (it - mean) }.sum() / (n - 1) else 0.0
+        val mean = inWindow.sum().toDouble() / n
+        val variance = if (n > 1) inWindow.map { (it.toDouble() - mean) * (it.toDouble() - mean) }.sum() / (n - 1) else 0.0
         val std = sqrt(variance).toFloat()
         val minVal = inWindow.minOrNull()!!
         val maxVal = inWindow.maxOrNull()!!
@@ -185,9 +185,10 @@ class ImuWindowAggregator {
             val lag = (n * 0.15).toInt().coerceIn(5, n / 3)
             var corr = 0.0
             for (i in 0 until n - lag) {
-                corr += (inWindow[i] - mean) * (inWindow[i + lag] - mean)
+                corr += (inWindow[i].toDouble() - mean) * (inWindow[i + lag].toDouble() - mean)
             }
-            corr /= max(1.0, (n - lag) * variance)
+            val denominator = maxOf(1.0, (n - lag).toDouble() * variance)
+            corr /= denominator
             periodicity = corr.toFloat().coerceIn(0f, 1f)
         }
 
