@@ -297,12 +297,15 @@ class ImuWindowAggregator {
             ((phoneOnTable * 0.5f + lyingRatio * 0.5f)).coerceIn(0f, 1f)
         } else 0f
 
-        // Dominant pattern order
+        // Dominant pattern order:
+        // phone_in_hand must beat vehicle_vibration — manual phone use also
+        // produces small jerks that the vehicle detector falsely matches.
+        // walking is unambiguous and beats everything else.
         val dominant = when {
             walking >= 0.65f -> "walking_with_phone"
-            vehicleVib >= 0.65f -> "vehicle_vibration"
             phoneInHand >= 0.55f -> "phone_in_hand_scrolling"
             phoneOnTable >= 0.65f -> "phone_on_table"
+            vehicleVib >= 0.65f -> "vehicle_vibration"
             lyingStill >= 0.65f && phoneOnTable >= 0.55f -> "lying_still"
             else -> "unknown"
         }
