@@ -195,8 +195,13 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
             .onFailure { Logger.w("Accel", "emit failed: ${it.message}") }
 
         // M1B: poll completed IMU window and upload
-        val agg = aggregator ?: return
+        val agg = aggregator
+        if (agg == null) {
+            Logger.w("Accel", "imu aggregator is null — M1B not wired")
+            return@maybeEmit
+        }
         val feature = agg.pollCompleted(System.currentTimeMillis())
+        Logger.i("Accel", "imu poll samples=${agg.accelSampleCount()}/${agg.gyroSampleCount()} windowMs=${agg.windowDurationMs} feature=${feature != null}")
         if (feature != null) {
             val imuJson = ImuWindowJson.toJson(feature, deviceId)
             runCatching { emit(SensorType.IMU_WINDOW, imuJson) }

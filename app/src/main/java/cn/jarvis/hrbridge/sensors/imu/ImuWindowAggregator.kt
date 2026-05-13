@@ -326,4 +326,7 @@ class ImuWindowAggregator {
     private fun recalcWindowStart() {
         windowStartMs = accelSamples.firstOrNull()?.tMs ?: windowStartMs
     }
+
+    fun accelSampleCount(): Int = synchronized(lock) { accelSamples.size }
+    fun gyroSampleCount(): Int = synchronized(lock) { gyroSamples.size }
 }
