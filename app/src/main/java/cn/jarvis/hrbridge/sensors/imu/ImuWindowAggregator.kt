@@ -284,10 +284,16 @@ class ImuWindowAggregator {
         } else 0f
 
         // vehicle_vibration = high-frequency low-amplitude + drift (simplified)
+        // M1B Fix: Must strictly penalize if phone is being handled (gyro is active).
+        // Holding the phone in hand while sitting still can produce small jerks.
         val vehicleVib = if (accel.n > 0) {
-            val hasVibration = (accel.jerkMean > 0.8f && accel.stdMagnitude < 2.0f)
+            val hasVibration = (accel.jerkMean > 0.6f && accel.stdMagnitude < 1.5f)
             val hasNoSteps = (accel.periodicityScore < 0.2f)
-            if (hasVibration && hasNoSteps) 0.72f else 0.05f
+            val noHandling = (gyro.phoneHandlingScore < 0.3f)
+            if (hasVibration && hasNoSteps && noHandling) {
+                // Confidence scales with how little it is being handled
+                0.72f * (1f - gyro.phoneHandlingScore)
+            } else 0.05f
         } else 0f
 
         // lying_still = phone_on_table + posture hint (simplified: horizontal orientation)
