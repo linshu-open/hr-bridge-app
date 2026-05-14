@@ -22,13 +22,13 @@ class BootReceiver : BroadcastReceiver() {
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_LOCKED_BOOT_COMPLETED,
-            Intent.ACTION_MY_PACKAGE_REPLACED -> {
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_POWER_CONNECTED,
+            Intent.ACTION_USER_PRESENT -> {
                 val pending = goAsync()
                 CoroutineScope(Dispatchers.Default).launch {
                     try {
-                        val s = ServiceLocator.settingsStore.settings.first()
-                        Logger.i("BootReceiver", "auto start service, device=${s.selectedDeviceName.ifEmpty { "none" }}")
-                        HeartRateService.start(context)
+                        BridgeRuntime.ensureScheduledAndMaybeStart(context, intent.action ?: "unknown")
                         UploadWorker.schedule(context)
                     } finally {
                         pending.finish()

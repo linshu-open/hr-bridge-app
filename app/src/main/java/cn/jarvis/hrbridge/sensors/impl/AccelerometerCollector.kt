@@ -145,6 +145,12 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         UploadMode.REALTIME    ->  20_000   // ~50Hz
     }
 
+    private fun maxReportLatencyUs(): Int = when (mode) {
+        UploadMode.POWER_SAVER -> 60_000_000 // 60s
+        UploadMode.NORMAL      -> 30_000_000 // 30s
+        UploadMode.REALTIME    ->  5_000_000 // 5s
+    }
+
     private fun intervalMs(): Long = when (mode) {
         UploadMode.POWER_SAVER -> 5 * 60_000L
         UploadMode.NORMAL      ->     60_000L
@@ -152,7 +158,11 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
     }
 
     private fun registerListener() {
-        sm?.registerListener(listener, sensor, sensorDelayUs())
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            sm?.registerListener(listener, sensor, sensorDelayUs(), maxReportLatencyUs())
+        } else {
+            sm?.registerListener(listener, sensor, sensorDelayUs())
+        }
     }
 
     private fun startTimer() {

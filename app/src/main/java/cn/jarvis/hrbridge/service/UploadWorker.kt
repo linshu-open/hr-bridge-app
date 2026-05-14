@@ -20,12 +20,12 @@ import java.util.concurrent.TimeUnit
  * - 单次最多拉 50 条，由 Repository 做批量端点调用
  * - 失败由 WorkManager 内置重试机制（指数退避）
  */
-class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+class UploadWorker(private val ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = WakeLockScope.withPartialWakeLock(ctx, "UploadWorker", 15_000L) {
         val hrRepo = ServiceLocator.hrRepository
         val sensorRepo = ServiceLocator.sensorRepository
-        return try {
+        return@withPartialWakeLock try {
             val hrN = hrRepo.flushBatch(maxBatch = 50)
             val sensorN = sensorRepo.flushPending(maxBatch = 80)
             Logger.i("UploadWorker", "上传 HR=$hrN sensor=$sensorN")

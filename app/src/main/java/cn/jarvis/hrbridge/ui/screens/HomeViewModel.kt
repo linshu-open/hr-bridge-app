@@ -89,4 +89,11 @@ class HomeViewModel : ViewModel() {
     }
 
     fun clearTestMessage() { _testMessage.value = null }
+
+    fun setDesiredRunning(desired: Boolean) {
+        viewModelScope.launch {
+            ServiceLocator.settingsStore.setBridgeDesiredRunning(desired)
+            Logger.i("HomeVM", "Desired running state set to: $desired")
+        }
+    }
 }

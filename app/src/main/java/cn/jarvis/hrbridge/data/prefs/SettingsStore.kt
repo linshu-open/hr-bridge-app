@@ -51,7 +51,10 @@ data class AppSettings(
     val retainDays: Int = 7,
     val sedentaryAlertMin: Int = 120,
 
-    val migratedFromV1: Boolean = false
+    val migratedFromV1: Boolean = false,
+
+    // ---- Watchdog 状态 ----
+    val bridgeDesiredRunning: Boolean = false
 ) {
     companion object {
         const val DARK_SYSTEM = 0
@@ -96,6 +99,8 @@ class SettingsStore(private val ctx: Context) {
         val OFFICE_LNG        = floatPreferencesKey("office_lng")
         val RETAIN_DAYS       = intPreferencesKey("retain_days")
         val SEDENTARY_MIN     = intPreferencesKey("sedentary_alert_min")
+
+        val BRIDGE_DESIRED_RUNNING = booleanPreferencesKey("bridge_desired_running")
     }
 
     val settings: Flow<AppSettings> = ctx.dataStore.data
@@ -130,7 +135,8 @@ class SettingsStore(private val ctx: Context) {
                 officeLng         = p[Keys.OFFICE_LNG]   ?: 0f,
                 retainDays        = p[Keys.RETAIN_DAYS]  ?: 7,
                 sedentaryAlertMin = p[Keys.SEDENTARY_MIN] ?: 120,
-                migratedFromV1    = p[Keys.MIGRATED_V1]  ?: false
+                migratedFromV1    = p[Keys.MIGRATED_V1]  ?: false,
+                bridgeDesiredRunning = p[Keys.BRIDGE_DESIRED_RUNNING] ?: false
             )
         }
 
@@ -174,6 +180,8 @@ class SettingsStore(private val ctx: Context) {
     }
     suspend fun setRetainDays(days: Int) = edit { it[Keys.RETAIN_DAYS] = days }
     suspend fun setSedentaryAlertMin(min: Int) = edit { it[Keys.SEDENTARY_MIN] = min }
+
+    suspend fun setBridgeDesiredRunning(desired: Boolean) = edit { it[Keys.BRIDGE_DESIRED_RUNNING] = desired }
 
     private suspend inline fun edit(crossinline block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         ctx.dataStore.edit { block(it) }

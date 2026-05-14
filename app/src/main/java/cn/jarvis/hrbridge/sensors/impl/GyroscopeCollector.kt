@@ -65,7 +65,7 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         this.mode = mode
         this.emitRef = emit
         this.scopeRef = scope
-        sm?.registerListener(listener, sensor, 200_000) // ~5Hz
+        registerListener()
         startTimer()
         Logger.i("Gyro", "started, mode=$mode")
     }
@@ -73,6 +73,8 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     override fun onModeChanged(mode: UploadMode) {
         if (this.mode == mode) return
         this.mode = mode
+        sm?.unregisterListener(listener)
+        registerListener()
         restartTimer()
     }
 
@@ -86,6 +88,26 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     }
 
     // ---- internal ----
+
+    private fun sensorDelayUs(): Int = when (mode) {
+        UploadMode.POWER_SAVER -> 200_000   // ~5Hz
+        UploadMode.NORMAL      -> 200_000   // ~5Hz
+        UploadMode.REALTIME    ->  40_000   // ~25Hz
+    }
+
+    private fun maxReportLatencyUs(): Int = when (mode) {
+        UploadMode.POWER_SAVER -> 60_000_000 // 60s
+        UploadMode.NORMAL      -> 30_000_000 // 30s
+        UploadMode.REALTIME    ->  5_000_000 // 5s
+    }
+
+    private fun registerListener() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            sm?.registerListener(listener, sensor, sensorDelayUs(), maxReportLatencyUs())
+        } else {
+            sm?.registerListener(listener, sensor, sensorDelayUs())
+        }
+    }
 
     private fun intervalMs(): Long = when (mode) {
         UploadMode.POWER_SAVER -> 5 * 60_000L

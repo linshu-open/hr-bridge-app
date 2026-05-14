@@ -49,6 +49,7 @@ fun HomeScreen(
         if (granted) {
             HeartRateService.start(ctx)
             serviceRunning = true
+            vm.setDesiredRunning(true)
         } else if (!granted) {
             showPermDeniedDialog = true
         }
@@ -116,6 +117,7 @@ fun HomeScreen(
                     onClick = {
                         HeartRateService.stop(ctx)
                         serviceRunning = false
+                        vm.setDesiredRunning(false)
                     },
                     enabled = serviceRunning,
                     modifier = Modifier.weight(1f)

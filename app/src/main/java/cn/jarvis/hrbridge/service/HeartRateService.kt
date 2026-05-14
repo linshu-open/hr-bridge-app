@@ -66,6 +66,9 @@ class HeartRateService : LifecycleService() {
             // 注册周期上传任务（幂等）
             UploadWorker.schedule(this@HeartRateService)
 
+            // M1B-S1: 保证 watchdog 在线
+            BridgeRuntime.ensureWatchdogScheduled(this@HeartRateService)
+
             // 启动通用传感器（即使没选手环也可以跑其他传感器）
             runCatching {
                 ServiceLocator.sensorHub.start(
@@ -207,9 +210,11 @@ class HeartRateService : LifecycleService() {
                 val settings = ServiceLocator.settingsStore.settings.first()
                 val intervalMs = settings.uploadIntervalSec.coerceIn(30, 900) * 1000L
                 runCatching {
-                    val hrN = ServiceLocator.hrRepository.flushBatch(maxBatch = 50)
-                    val sensorN = ServiceLocator.sensorRepository.flushPending(maxBatch = 80)
-                    Logger.i("HRService", "foreground flush HR=$hrN sensor=$sensorN")
+                    WakeLockScope.withPartialWakeLock(this@HeartRateService, "FgFlush", 15_000L) {
+                        val hrN = ServiceLocator.hrRepository.flushBatch(maxBatch = 50)
+                        val sensorN = ServiceLocator.sensorRepository.flushPending(maxBatch = 80)
+                        Logger.i("HRService", "foreground flush HR=$hrN sensor=$sensorN")
+                    }
                 }.onFailure {
                     Logger.w("HRService", "foreground flush failed: ${it.message}")
                 }
