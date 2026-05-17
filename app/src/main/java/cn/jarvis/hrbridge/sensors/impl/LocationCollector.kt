@@ -42,11 +42,30 @@ class LocationCollector(private val ctx: Context) : SensorCollector {
     private var scopeRef: CoroutineScope? = null
     private var lastLat: Double = 0.0
     private var lastLng: Double = 0.0
+    private var lastEmittedTimeMs: Long = 0L
 
     private val listener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
+            val now = System.currentTimeMillis()
+            val interval = intervalMs()
+            val minDist = minDistanceM()
+
+            // 计算距离上次发射的距离
+            val dist = if (lastLat != 0.0 && lastLng != 0.0) {
+                distance(loc.latitude, loc.longitude, lastLat, lastLng)
+            } else {
+                Double.MAX_VALUE
+            }
+
+            // 严格节流：时间间隔未达到且位移未达到设定阈值时丢弃，避免静止时高频上报位置
+            if (lastEmittedTimeMs != 0L && (now - lastEmittedTimeMs < interval - 5000L) && dist < minDist) {
+                Logger.d("Location", "Dropped duplicate/frequent update: elapsed=${now - lastEmittedTimeMs}ms dist=${"%.1f".format(dist)}m")
+                return
+            }
+
             lastLat = loc.latitude
             lastLng = loc.longitude
+            lastEmittedTimeMs = now
             val scope = scopeRef ?: return
             scope.launch { emitLocation(loc) }
         }

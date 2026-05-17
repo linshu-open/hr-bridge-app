@@ -49,6 +49,8 @@ class BleConnection(private val ctx: Context) {
     val events: Flow<Event> = _events.asSharedFlow()
 
     @Volatile private var gatt: BluetoothGatt? = null
+    @Volatile var isConnected: Boolean = false
+        private set
 
     private fun hasConnectPermission(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -77,6 +79,7 @@ class BleConnection(private val ctx: Context) {
         _events.tryEmit(Event.Connecting)
         Logger.i("BleConn", "connecting $mac")
         gatt?.close()
+        isConnected = false
         gatt = device.connectGatt(
             ctx, /* autoConnect = */ false,
             callback,
@@ -94,6 +97,7 @@ class BleConnection(private val ctx: Context) {
             Logger.w("BleConn", "disconnect 权限异常: ${e.message}")
         }
         gatt = null
+        isConnected = false
     }
 
     private val callback = object : BluetoothGattCallback() {
@@ -101,6 +105,7 @@ class BleConnection(private val ctx: Context) {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
+                    isConnected = true
                     _events.tryEmit(Event.Connected(g.device.address))
                     Logger.i("BleConn", "connected → discoverServices")
                     try { g.discoverServices() } catch (e: SecurityException) {
@@ -108,6 +113,7 @@ class BleConnection(private val ctx: Context) {
                     }
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
+                    isConnected = false
                     _events.tryEmit(Event.Disconnected(status))
                     Logger.i("BleConn", "disconnected status=$status")
                 }
