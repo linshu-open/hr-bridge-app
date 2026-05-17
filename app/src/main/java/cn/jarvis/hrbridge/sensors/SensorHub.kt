@@ -22,6 +22,7 @@ class SensorHub(
 ) : MotionStateListener {
     @Volatile private var currentMode: UploadMode = UploadMode.NORMAL
     private val running: MutableSet<String> = mutableSetOf()
+    @Volatile private var currentEnabledSensors: Set<String> = emptySet()
 
     /** Shared IMU aggregator for cross-sensor windowing (M1B) */
     @Volatile
@@ -59,6 +60,7 @@ class SensorHub(
 
     fun start(scope: CoroutineScope, enabled: Set<String>, mode: UploadMode) {
         currentMode = mode
+        currentEnabledSensors = enabled
         imuAggregator.applyMode(mode)
 
         // If IMU_WINDOW is enabled, we must silently force ACCELEROMETER and GYROSCOPE to run to feed the aggregator
@@ -68,9 +70,9 @@ class SensorHub(
             enabled
         }
 
-        // Only allow ingestion of sensors that the user has explicitly enabled
+        // Only allow ingestion of sensors that the user has explicitly enabled (dynamic lookup avoids stale captured closures)
         val emit: Emit = { type, json ->
-            if (type in enabled) {
+            if (type in currentEnabledSensors) {
                 repo.ingest(type, json)
             }
         }
