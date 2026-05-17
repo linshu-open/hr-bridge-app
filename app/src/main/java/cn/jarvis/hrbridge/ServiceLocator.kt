@@ -136,8 +136,9 @@ object ServiceLocator {
     private suspend fun ensureCurrentMcpEndpoints() {
         val s = settingsStore.settings.first()
         fun isOldOrUnsafe(url: String): Boolean {
-            val normalized = url.trim().lowercase()
+            val normalized = url.lowercase()
             return normalized.isBlank() ||
+                normalized.startsWith("http://") ||
                 "100.126.107.40" in normalized ||
                 "114.132.201.207" in normalized ||
                 ":18890" in normalized ||
@@ -150,7 +151,7 @@ object ServiceLocator {
         if (isOldOrUnsafe(s.batchUrl)) {
             settingsStore.setBatchUrl(BuildConfig.DEFAULT_BATCH_URL)
         }
-        if (isOldOrUnsafe(s.sensorBaseUrl)) {
+        if (isOldOrUnsafe(s.sensorBaseUrl) || "/mcp/api/sensor" !in s.sensorBaseUrl) {
             settingsStore.setSensorBaseUrl(BuildConfig.DEFAULT_SENSOR_BASE_URL)
         }
     }
