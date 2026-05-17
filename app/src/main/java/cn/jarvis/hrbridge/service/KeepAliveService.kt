@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import cn.jarvis.hrbridge.MainActivity
+import cn.jarvis.hrbridge.R
 import cn.jarvis.hrbridge.util.Logger
 
 /**
