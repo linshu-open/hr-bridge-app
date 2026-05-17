@@ -25,7 +25,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" tools:targetApi="34"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:targetApi="34"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:targetApi="34"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SENSORS" tools:targetApi="34"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
@@ -84,7 +83,7 @@
         <service
             android:name=".service.HeartRateService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|health|location|sensors"/>
+            android:foregroundServiceType="connectedDevice|health|location"/>
 
         <!-- 双进程守护前台服务：独立进程，作为主进程锚点 -->
         <service
