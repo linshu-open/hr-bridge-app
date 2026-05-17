@@ -12,6 +12,7 @@ import cn.jarvis.hrbridge.data.repo.HrRepository
 import cn.jarvis.hrbridge.sensors.AlertManager
 import cn.jarvis.hrbridge.sensors.SensorHub
 import cn.jarvis.hrbridge.sensors.SensorRepository
+import cn.jarvis.hrbridge.sensors.SensorRingBuffer
 import cn.jarvis.hrbridge.sensors.impl.AccelerometerCollector
 import cn.jarvis.hrbridge.sensors.impl.BluetoothStateCollector
 import cn.jarvis.hrbridge.sensors.impl.GyroscopeCollector
@@ -46,6 +47,8 @@ object ServiceLocator {
     lateinit var sensorHub: SensorHub            ; private set
     lateinit var alertManager: AlertManager       ; private set
     lateinit var bleScanner: BleScanner          ; private set
+    lateinit var accelRing: SensorRingBuffer      ; private set
+    lateinit var gyroRing: SensorRingBuffer       ; private set
     private lateinit var appScope: CoroutineScope
 
     /** 专用给前台服务用；每个 Service 实例独占一个 BleConnection（因为 GATT 是一对一） */
@@ -78,6 +81,9 @@ object ServiceLocator {
         jarvisApi     = JarvisApi()
         githubApi     = GithubApi()
         bleScanner    = BleScanner(appCtx)
+ 
+        accelRing = SensorRingBuffer(capacity = 3600, fieldsPerSample = 5)
+        gyroRing = SensorRingBuffer(capacity = 3600, fieldsPerSample = 5)
 
         val db = HrDatabase.get(appCtx)
         hrRepository = HrRepository(db.hrDao(), jarvisApi, settingsStore)
@@ -108,6 +114,15 @@ object ServiceLocator {
         accelerometerCollector.motionDetector = sensorHub.motionDetector
 
         appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        // 持续收集 Settings 变化更新内存缓存，提供极速同步读取
+        appScope.launch {
+            runCatching {
+                settingsStore.settings.collect { settings ->
+                    settingsStore.cache = settings
+                }
+            }
+        }
 
         // 后台跑一次 v1→v2 迁移 + 维护
         appScope.launch {

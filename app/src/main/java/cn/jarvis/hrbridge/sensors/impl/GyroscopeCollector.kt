@@ -10,22 +10,16 @@ import cn.jarvis.hrbridge.sensors.SensorCollector
 import cn.jarvis.hrbridge.sensors.SensorFreqConfig
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
-import cn.jarvis.hrbridge.sensors.imu.GyroSample
 import cn.jarvis.hrbridge.sensors.imu.ImuWindowAggregator
 import cn.jarvis.hrbridge.util.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 
 /**
- * 陀螺仪采集。
+ * 陀螺仪采集 (V2 极致优化版)。
  *
- * - SensorManager.TYPE_GYROSCOPE 5Hz
- * - angular_speed = sqrt(x²+y²+z²)；posture 推断(upright|lying|tilted)
- * - 上传频率同加速度计梯度：POWER_SAVER 5min / NORMAL 1min / REALTIME 10s
- * - M1B: 喂原始样本到 ImuWindowAggregator
+ * - 纯粹的生产者：onSensorChanged 只做极轻量赋值与写入 ServiceLocator.gyroRing。
+ * - 无 Coroutine timer，无实时复杂数学计算。
  */
 class GyroscopeCollector(private val ctx: Context) : SensorCollector {
 
@@ -38,25 +32,28 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     private var freqConfig: SensorFreqConfig? = null
     private var emitRef: Emit? = null
     private var scopeRef: CoroutineScope? = null
-    private var timerJob: Job? = null
 
-    private var lastX: Float = 0f
-    private var lastY: Float = 0f
-    private var lastZ: Float = 0f
-    private var lastAngularSpeed: Float = 0f
+    @Volatile var lastX: Float = 0f; private set
+    @Volatile var lastY: Float = 0f; private set
+    @Volatile var lastZ: Float = 0f; private set
+    @Volatile var lastAngularSpeed: Float = 0f; private set
 
-    // ---- M1B IMU aggregator ----
     var aggregator: ImuWindowAggregator? = null
 
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
-            lastX = event.values[0]
-            lastY = event.values[1]
-            lastZ = event.values[2]
-            lastAngularSpeed = sqrt(lastX * lastX + lastY * lastY + lastZ * lastZ)
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            val speed = sqrt(x * x + y * y + z * z)
 
-            // M1B: feed raw sample to IMU window aggregator
-            aggregator?.addGyro(GyroSample(System.currentTimeMillis(), lastX, lastY, lastZ, lastAngularSpeed))
+            lastX = x
+            lastY = y
+            lastZ = z
+            lastAngularSpeed = speed
+
+            // 写入高性能、轻量级环形缓冲区
+            cn.jarvis.hrbridge.ServiceLocator.gyroRing.put(x, y, z, speed, System.currentTimeMillis().toFloat())
         }
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
@@ -68,8 +65,7 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         this.emitRef = emit
         this.scopeRef = scope
         registerListener()
-        startTimer()
-        Logger.i("Gyro", "started, mode=$mode")
+        Logger.i("Gyro", "started (V2 RingBuffer mode), mode=$mode")
     }
 
     override fun onModeChanged(mode: UploadMode) {
@@ -77,29 +73,22 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         this.mode = mode
         sm?.unregisterListener(listener)
         registerListener()
-        restartTimer()
     }
 
     override fun applyFrequency(config: SensorFreqConfig) {
         if (config == freqConfig) return
         freqConfig = config
-        // Re-register listener with new gyro parameters
         sm?.unregisterListener(listener)
         registerListener()
-        restartTimer()
-        Logger.d("Gyro", "freq applied: delay=${config.gyroDelayUs}us latency=${config.gyroReportLatencyUs}us upload=${config.uploadIntervalMs}ms")
+        Logger.d("Gyro", "freq applied: delay=${config.gyroDelayUs}us latency=${config.gyroReportLatencyUs}us")
     }
 
     override fun stop() {
-        timerJob?.cancel()
-        timerJob = null
         sm?.unregisterListener(listener)
         emitRef = null
         scopeRef = null
         Logger.i("Gyro", "stopped")
     }
-
-    // ---- internal ----
 
     private fun sensorDelayUs(): Int = freqConfig?.gyroDelayUs ?: when (mode) {
         UploadMode.POWER_SAVER -> 200_000
@@ -119,52 +108,5 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         } else {
             sm?.registerListener(listener, sensor, sensorDelayUs())
         }
-    }
-
-    private fun intervalMs(): Long = freqConfig?.uploadIntervalMs ?: when (mode) {
-        UploadMode.POWER_SAVER -> 5 * 60_000L
-        UploadMode.NORMAL      ->     60_000L
-        UploadMode.REALTIME    ->     10_000L
-    }
-
-    private fun startTimer() {
-        val scope = scopeRef ?: return
-        timerJob = scope.launch {
-            while (true) {
-                delay(intervalMs())
-                maybeEmit()
-            }
-        }
-    }
-
-    private fun restartTimer() {
-        timerJob?.cancel()
-        startTimer()
-    }
-
-    private suspend fun maybeEmit() {
-        val emit = emitRef ?: return
-        val ts = System.currentTimeMillis() / 1000
-        val posture = inferPosture()
-
-        val json = buildString {
-            append("{")
-            append("\"angular_speed\":${"%.2f".format(lastAngularSpeed)},")
-            append("\"x\":${"%.2f".format(lastX)},")
-            append("\"y\":${"%.2f".format(lastY)},")
-            append("\"z\":${"%.2f".format(lastZ)},")
-            append("\"posture\":\"$posture\",")
-            append("\"ts\":$ts")
-            append("}")
-        }
-        runCatching { emit(SensorType.GYROSCOPE, json) }
-            .onFailure { Logger.w("Gyro", "emit failed: ${it.message}") }
-    }
-
-    /** 简化姿态推断：Y 轴角速度大 = 旋转/翻身，整体小 = 静止 */
-    private fun inferPosture(): String = when {
-        lastAngularSpeed < 0.1f -> "upright"
-        lastY > 0.5f            -> "lying"
-        else                    -> "tilted"
     }
 }

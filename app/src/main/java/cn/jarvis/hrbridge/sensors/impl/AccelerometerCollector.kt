@@ -11,25 +11,16 @@ import cn.jarvis.hrbridge.sensors.SensorFreqConfig
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.sensors.MotionStateDetector
-import cn.jarvis.hrbridge.sensors.imu.AccelSample
 import cn.jarvis.hrbridge.sensors.imu.ImuWindowAggregator
-import cn.jarvis.hrbridge.sensors.imu.ImuWindowJson
 import cn.jarvis.hrbridge.util.Logger
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 
 /**
- * 加速度计采集。
+ * 加速度计采集 (V2 极致优化版)。
  *
- * - 注册 SensorManager.TYPE_ACCELEROMETER（50Hz 实时 / 5Hz 省电）
- * - 滑动窗口聚合：magnitude / activity(still|walking|running|vigorous)
- * - 跌倒检测：magnitude 突降 + 静止 → fall_detected = true
- * - 久坐累计：still_duration_min
- * - 上传频率：POWER_SAVER 5min / NORMAL 1min / REALTIME 10s
- * - M1B: 喂原始样本到 ImuWindowAggregator，poll 完成的 IMU 窗口上传
+ * - 纯粹的生产者：onSensorChanged 只做极轻量赋值与写入 ServiceLocator.accelRing。
+ * - 无 Coroutine timer，无实时复杂数学计算（运动/跌倒检测全部移至 60s 唤醒周期内进行批量处理）。
  */
 class AccelerometerCollector(private val ctx: Context) : SensorCollector {
 
@@ -42,95 +33,31 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
     private var freqConfig: SensorFreqConfig? = null
     private var emitRef: Emit? = null
     private var scopeRef: CoroutineScope? = null
-    private var timerJob: Job? = null
 
-    // ---- 滑动窗口 ----
-    private val windowMs: Long = 10_000L  // 10s 聚合窗口
-    private val samples = ArrayDeque<Float>()  // magnitude 值
-    private var windowStartMs: Long = 0L
-    private var lastX: Float = 0f
-    private var lastY: Float = 0f
-    private var lastZ: Float = 0f
-    private var lastMagnitude: Float = 9.81f
+    // 保留这几个 volatile 变量，以防外部或日志有极速查询需要
+    @Volatile var lastX: Float = 0f; private set
+    @Volatile var lastY: Float = 0f; private set
+    @Volatile var lastZ: Float = 0f; private set
+    @Volatile var lastMagnitude: Float = 9.81f; private set
 
-    // ---- 跌倒检测 ----
-    private var prevMagnitude: Float = 9.81f
-    private var fallCandidateTs: Long = 0L
-    private var fallDetected: Boolean = false
-
-    // ---- 久坐 ----
-    private var stillSinceMs: Long = System.currentTimeMillis()
-    private var currentActivity: String = "still"
-
-    // ---- M1B IMU aggregator ----
+    // 以下两个为了保持 ServiceLocator 初始化处的 API 兼容性，在 V2 中实际计算转移到 Alarm 周期内
     var aggregator: ImuWindowAggregator? = null
-
-    // ---- Motion state detector (master trigger role) ----
     var motionDetector: MotionStateDetector? = null
-    private var deviceId: String = "android-phone"
 
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             val x = event.values[0]
             val y = event.values[1]
             val z = event.values[2]
-            lastX = x; lastY = y; lastZ = z
             val mag = sqrt(x * x + y * y + z * z)
+
+            lastX = x
+            lastY = y
+            lastZ = z
             lastMagnitude = mag
 
-            // M1B: feed raw sample to IMU window aggregator and poll completed window in real-time
-            val agg = aggregator
-            if (agg != null) {
-                val nowMs = System.currentTimeMillis()
-                agg.addAccel(AccelSample(nowMs, x, y, z, mag))
-                
-                val feature = agg.pollCompleted(nowMs)
-                if (feature != null) {
-                    val scope = scopeRef
-                    val emit = emitRef
-                    if (scope != null && emit != null) {
-                        scope.launch {
-                            val imuJson = ImuWindowJson.toJson(feature, deviceId)
-                            runCatching { emit(SensorType.IMU_WINDOW, imuJson) }
-                                .onFailure { Logger.w("Accel", "imu_window emit failed: ${it.message}") }
-                        }
-                    }
-                    agg.clearLocked()
-                }
-            }
-
-            // Master trigger: feed magnitude to motion state detector
-            motionDetector?.feedMagnitude(mag)
-
-            // 跌倒检测：幅值突然大幅下降（从 >15 降到 <5），且随后静止
-            if (prevMagnitude > 15f && mag < 5f) {
-                fallCandidateTs = System.currentTimeMillis()
-            }
-            if (fallCandidateTs > 0L && System.currentTimeMillis() - fallCandidateTs in 500..3000 && mag < 3f) {
-                fallDetected = true
-                fallCandidateTs = 0L
-            }
-            prevMagnitude = mag
-
-            // 活动分类
-            currentActivity = classifyActivity(mag)
-
-            // 久坐计时
-            if (currentActivity == "still") {
-                // stillSinceMs 不重置，持续累加
-            } else {
-                stillSinceMs = System.currentTimeMillis()
-            }
-
-            // 滑动窗口收集
-            val now = System.currentTimeMillis()
-            if (windowStartMs == 0L) windowStartMs = now
-            samples.addLast(mag)
-            // 裁剪超出窗口的旧样本
-            while (samples.isNotEmpty() && now - windowStartMs > windowMs) {
-                samples.removeFirst()
-                windowStartMs = now - windowMs
-            }
+            // 写入高性能、无锁/轻量级环形缓冲区
+            cn.jarvis.hrbridge.ServiceLocator.accelRing.put(x, y, z, mag, System.currentTimeMillis().toFloat())
         }
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
@@ -142,8 +69,7 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         this.emitRef = emit
         this.scopeRef = scope
         registerListener()
-        startTimer()
-        Logger.i("Accel", "started, mode=$mode")
+        Logger.i("Accel", "started (V2 RingBuffer mode), mode=$mode")
     }
 
     override fun onModeChanged(mode: UploadMode) {
@@ -151,30 +77,22 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         this.mode = mode
         sm?.unregisterListener(listener)
         registerListener()
-        restartTimer()
     }
 
     override fun applyFrequency(config: SensorFreqConfig) {
         if (config == freqConfig) return
         freqConfig = config
-        // Re-register listener with new accel parameters
         sm?.unregisterListener(listener)
         registerListener()
-        restartTimer()
-        Logger.d("Accel", "freq applied: delay=${config.accelDelayUs}us latency=${config.accelReportLatencyUs}us upload=${config.uploadIntervalMs}ms")
+        Logger.d("Accel", "freq applied: delay=${config.accelDelayUs}us latency=${config.accelReportLatencyUs}us")
     }
 
     override fun stop() {
-        timerJob?.cancel()
-        timerJob = null
         sm?.unregisterListener(listener)
         emitRef = null
         scopeRef = null
-        samples.clear()
         Logger.i("Accel", "stopped")
     }
-
-    // ---- internal ----
 
     private fun sensorDelayUs(): Int = freqConfig?.accelDelayUs ?: when (mode) {
         UploadMode.POWER_SAVER -> 200_000   // ~5Hz
@@ -188,68 +106,11 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         UploadMode.REALTIME    ->  5_000_000 // 5s
     }
 
-    private fun intervalMs(): Long = freqConfig?.uploadIntervalMs ?: when (mode) {
-        UploadMode.POWER_SAVER -> 5 * 60_000L
-        UploadMode.NORMAL      ->     60_000L
-        UploadMode.REALTIME    ->     10_000L
-    }
-
     private fun registerListener() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             sm?.registerListener(listener, sensor, sensorDelayUs(), maxReportLatencyUs())
         } else {
             sm?.registerListener(listener, sensor, sensorDelayUs())
         }
-    }
-
-    private fun startTimer() {
-        val scope = scopeRef ?: return
-        timerJob = scope.launch {
-            while (true) {
-                delay(intervalMs())
-                maybeEmit()
-            }
-        }
-    }
-
-    private fun restartTimer() {
-        timerJob?.cancel()
-        startTimer()
-    }
-
-    private suspend fun maybeEmit() {
-        val emit = emitRef ?: return
-        val ts = System.currentTimeMillis() / 1000
-        val mag = lastMagnitude
-        val avgMag = if (samples.isNotEmpty()) samples.average().toFloat() else mag
-        val stillMin = ((System.currentTimeMillis() - stillSinceMs) / 60_000L).toInt()
-        val fall = fallDetected
-        if (fall) fallDetected = false  // consume
-
-        val json = buildString {
-            append("{")
-            append("\"magnitude\":${"%.2f".format(avgMag)},")
-            append("\"x\":${"%.2f".format(lastX)},")
-            append("\"y\":${"%.2f".format(lastY)},")
-            append("\"z\":${"%.2f".format(lastZ)},")
-            append("\"activity\":\"$currentActivity\",")
-            append("\"fall_detected\":$fall,")
-            append("\"still_duration_min\":$stillMin,")
-            append("\"ts\":$ts")
-            append("}")
-        }
-        runCatching { emit(SensorType.ACCELEROMETER, json) }
-            .onFailure { Logger.w("Accel", "emit failed: ${it.message}") }
-
-
-    }
-
-    private fun classifyActivity(mag: Float): String = when {
-        mag < 0.5f -> "still"
-        // A phone lying still reports gravity, about 9.8m/s^2. Treat that band as still.
-        mag <= 11.5f -> "still"
-        mag < 14f -> "walking"
-        mag < 20f -> "running"
-        else -> "vigorous"
     }
 }

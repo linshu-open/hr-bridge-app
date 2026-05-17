@@ -77,14 +77,7 @@
             </intent-filter>
         </activity>
 
-        <!-- 一像素悬浮窗（屏幕关闭时启动作为保活兜底） -->
-        <activity
-            android:name=".service.OnePixelActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleInstance"
-            android:taskAffinity=""
-            android:theme="@style/Theme.OnePixel" />
+
 
         <!-- 前台服务：BLE 连接 + 心率监测 + 手机传感器 Hub -->
         <service
@@ -102,6 +95,12 @@
         <!-- AlarmManager 精确唤醒接收器 -->
         <receiver
             android:name=".service.WatchdogAlarmReceiver"
+            android:exported="false"
+            android:enabled="true"/>
+
+        <!-- AlarmManager 传感器缓存批量刷盘与同步接收器 -->
+        <receiver
+            android:name=".service.SensorFlushReceiver"
             android:exported="false"
             android:enabled="true"/>
 

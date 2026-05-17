@@ -38,6 +38,23 @@ class SensorRepository(
         return id
     }
 
+    /** 同步入库：给 OS 事件回调线程使用，绕过任何协程调度器，即使协程被冻结也能入库 */
+    fun ingestSync(type: String, json: String): Long {
+        val id = dao.insertSync(
+            SensorRecordEntity(
+                sensorType = type,
+                dataJson = json,
+                timestamp = System.currentTimeMillis() / 1000
+            )
+        )
+        try {
+            alertManager?.onSensorData(type, json)
+        } catch (e: Exception) {
+            Logger.e("SensorRepo", "AlertManager sync error: ${e.message}")
+        }
+        return id
+    }
+
     /**
      * 顺序 flush 一批待上传数据：
      *  - 失败的单条按 retryCount++ 暂缓，由下次 worker 重试（WorkManager 外层也会退避）

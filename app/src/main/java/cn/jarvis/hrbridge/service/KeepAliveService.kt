@@ -29,13 +29,13 @@ import cn.jarvis.hrbridge.util.Logger
  */
 class KeepAliveService : Service() {
 
-    private var screenStatusReceiver: ScreenStatusReceiver? = null
+
 
     override fun onCreate() {
         super.onCreate()
         promoteToForeground()
         Logger.i("KeepAlive", "created in process: ${android.os.Process.myPid()}")
-        registerScreenReceiver()
+
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -55,7 +55,6 @@ class KeepAliveService : Service() {
         Logger.w("KeepAlive", "onDestroy — restarting main service")
         // 被杀前最后一搏：拉起主进程服务
         runCatching { HeartRateService.start(this) }
-        unregisterScreenReceiver()
         super.onDestroy()
     }
 
@@ -117,23 +116,7 @@ class KeepAliveService : Service() {
             startForeground(NOTIF_ID, notification)
         }
     }
-    private fun registerScreenReceiver() {
-        if (screenStatusReceiver == null) {
-            screenStatusReceiver = ScreenStatusReceiver()
-            val filter = IntentFilter().apply {
-                addAction(Intent.ACTION_SCREEN_OFF)
-                addAction(Intent.ACTION_SCREEN_ON)
-            }
-            registerReceiver(screenStatusReceiver, filter)
-        }
-    }
 
-    private fun unregisterScreenReceiver() {
-        screenStatusReceiver?.let {
-            unregisterReceiver(it)
-            screenStatusReceiver = null
-        }
-    }
 
     companion object {
         private const val NOTIF_ID = 2002

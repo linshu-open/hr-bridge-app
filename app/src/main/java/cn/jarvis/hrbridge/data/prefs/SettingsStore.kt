@@ -64,6 +64,7 @@ data class AppSettings(
 }
 
 class SettingsStore(private val ctx: Context) {
+    @Volatile var cache: AppSettings = AppSettings()
 
     private object Keys {
         val DEVICE_NAME = stringPreferencesKey("selected_device_name")
