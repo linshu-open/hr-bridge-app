@@ -15,8 +15,8 @@ object SensorType {
     const val SLEEP         = "sleep"
     const val IMU_WINDOW    = "imu_window"
 
-    /** 默认启用集合（Alpha1 先开 3 个核心传感器） */
-    val DEFAULT_ENABLED = setOf(HEART_RATE, STEP_COUNT, LOCATION)
+    /** 默认启用集合（V2 升级版：默认开启 IMU 感知以支持手势与运动分类上传） */
+    val DEFAULT_ENABLED = setOf(HEART_RATE, STEP_COUNT, LOCATION, ACCELEROMETER, GYROSCOPE, IMU_WINDOW)
 
     /** 全部通用端点类型（不含 HR，因为 HR 走专用端点） */
     val GENERIC = listOf(

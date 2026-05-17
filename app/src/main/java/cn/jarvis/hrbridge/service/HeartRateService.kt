@@ -50,13 +50,6 @@ class HeartRateService : LifecycleService() {
         super.onCreate()
         connection = ServiceLocator.newBleConnection()
         subscribeBleEvents()
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        super.onStartCommand(intent, flags, startId)
-
-        // 立刻进入前台，避免 Android 12+ 超时崩溃
-        promoteToForeground(getString(cn.jarvis.hrbridge.R.string.notif_service_scanning))
 
         lifecycleScope.launch {
             var isFirst = true
@@ -123,6 +116,13 @@ class HeartRateService : LifecycleService() {
                 }
             }
         }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+
+        // 立刻进入前台，避免 Android 12+ 超时崩溃
+        promoteToForeground(getString(cn.jarvis.hrbridge.R.string.notif_service_scanning))
 
         return START_STICKY
     }
