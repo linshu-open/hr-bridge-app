@@ -68,6 +68,11 @@ class ImuWindowAggregator {
         clearLocked()
     }
 
+    fun applyWindowDuration(durationMs: Long) = synchronized(lock) {
+        if (this.windowDurationMs == durationMs) return
+        this.windowDurationMs = durationMs
+    }
+
     // ── Poll completed ──
 
     fun pollCompleted(nowMs: Long): ImuWindowFeature? = synchronized(lock) {

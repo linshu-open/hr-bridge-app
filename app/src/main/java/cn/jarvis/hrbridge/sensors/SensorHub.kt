@@ -50,9 +50,9 @@ class SensorHub(
         val config = SensorFrequencyPolicy.onMotionStateChanged(old, new)
         currentFreqConfig = config
         applyFrequencyToAll(config)
-        // Also apply to IMU aggregator window duration
-        imuAggregator.applyMode(currentMode)
-        Logger.i("SensorHub", "motion $old → $new, freq: accel=${config.accelDelayUs}us upload=${config.uploadIntervalMs}ms")
+        // Apply dynamic IMU window duration according to the motion policy
+        imuAggregator.applyWindowDuration(config.imuWindowMs)
+        Logger.i("SensorHub", "motion $old → $new, freq: accel=${config.accelDelayUs}us upload=${config.uploadIntervalMs}ms imuWindow=${config.imuWindowMs}ms")
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -60,10 +60,23 @@ class SensorHub(
     fun start(scope: CoroutineScope, enabled: Set<String>, mode: UploadMode) {
         currentMode = mode
         imuAggregator.applyMode(mode)
-        val emit: Emit = { type, json -> repo.ingest(type, json) }
 
+        // If IMU_WINDOW is enabled, we must silently force ACCELEROMETER and GYROSCOPE to run to feed the aggregator
+        val actualEnabled = if (SensorType.IMU_WINDOW in enabled) {
+            enabled + SensorType.ACCELEROMETER + SensorType.GYROSCOPE
+        } else {
+            enabled
+        }
+
+        // Only allow ingestion of sensors that the user has explicitly enabled
+        val emit: Emit = { type, json ->
+            if (type in enabled) {
+                repo.ingest(type, json)
+            }
+        }
+ 
         for (c in collectors) {
-            val want = c.type in enabled && c.isAvailable()
+            val want = c.type in actualEnabled && c.isAvailable()
             val isRunning = c.type in running
             when {
                 want && !isRunning -> {
@@ -81,6 +94,7 @@ class SensorHub(
         }
         // Apply initial frequency config after start
         applyFrequencyToAll(currentFreqConfig)
+        imuAggregator.applyWindowDuration(currentFreqConfig.imuWindowMs)
     }
 
     fun applyMode(mode: UploadMode) {
