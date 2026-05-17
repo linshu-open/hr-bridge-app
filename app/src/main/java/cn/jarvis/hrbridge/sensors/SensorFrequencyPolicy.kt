@@ -40,9 +40,9 @@ object SensorFrequencyPolicy {
 
     private val STATIC_CONFIG = SensorFreqConfig(
         accelDelayUs = 200_000,          // 5Hz — 足以检测静止
-        accelReportLatencyUs = 60_000_000, // 60s 批处理
+        accelReportLatencyUs = 0,        // 禁用硬件批处理，防止部分手机硬件 FIFO 溢出死锁
         gyroDelayUs = 200_000,           // 5Hz
-        gyroReportLatencyUs = 60_000_000,
+        gyroReportLatencyUs = 0,
         lightEnabled = true,
         locationIntervalMs = 30 * 60_000L,  // 30min
         locationMinDistance = 50f,
@@ -52,9 +52,9 @@ object SensorFrequencyPolicy {
 
     private val STATIC_NIGHT_CONFIG = SensorFreqConfig(
         accelDelayUs = 200_000,
-        accelReportLatencyUs = 60_000_000,
+        accelReportLatencyUs = 0,
         gyroDelayUs = 200_000,
-        gyroReportLatencyUs = 60_000_000,
+        gyroReportLatencyUs = 0,
         lightEnabled = true,              // 光线仍需响应（开灯=起床信号）
         locationIntervalMs = 60 * 60_000L, // 60min — 夜间静止不需要频繁定位
         locationMinDistance = 100f,
@@ -64,9 +64,9 @@ object SensorFrequencyPolicy {
 
     private val AMBIENT_MOTION_CONFIG = SensorFreqConfig(
         accelDelayUs = 100_000,           // 10Hz
-        accelReportLatencyUs = 30_000_000,
+        accelReportLatencyUs = 0,
         gyroDelayUs = 100_000,            // 10Hz
-        gyroReportLatencyUs = 30_000_000,
+        gyroReportLatencyUs = 0,
         lightEnabled = true,
         locationIntervalMs = 15 * 60_000L,
         locationMinDistance = 30f,
@@ -76,9 +76,9 @@ object SensorFrequencyPolicy {
 
     private val HAND_MOVEMENT_CONFIG = SensorFreqConfig(
         accelDelayUs = 40_000,            // 25Hz
-        accelReportLatencyUs = 5_000_000,  // 5s 批处理
+        accelReportLatencyUs = 0,
         gyroDelayUs = 40_000,             // 25Hz
-        gyroReportLatencyUs = 5_000_000,
+        gyroReportLatencyUs = 0,
         lightEnabled = true,
         locationIntervalMs = 10 * 60_000L,
         locationMinDistance = 20f,
@@ -88,9 +88,9 @@ object SensorFrequencyPolicy {
 
     private val WALKING_CONFIG = SensorFreqConfig(
         accelDelayUs = 20_000,            // 50Hz — 需要高采样做步态分析
-        accelReportLatencyUs = 2_000_000,  // 2s
+        accelReportLatencyUs = 0,
         gyroDelayUs = 40_000,             // 25Hz
-        gyroReportLatencyUs = 2_000_000,
+        gyroReportLatencyUs = 0,
         lightEnabled = true,
         locationIntervalMs = 2 * 60_000L,  // 2min — 移动中定位需要及时
         locationMinDistance = 10f,
@@ -100,9 +100,9 @@ object SensorFrequencyPolicy {
 
     private val VEHICLE_CONFIG = SensorFreqConfig(
         accelDelayUs = 20_000,            // 50Hz
-        accelReportLatencyUs = 2_000_000,
+        accelReportLatencyUs = 0,
         gyroDelayUs = 40_000,             // 25Hz
-        gyroReportLatencyUs = 2_000_000,
+        gyroReportLatencyUs = 0,
         lightEnabled = true,
         locationIntervalMs = 5 * 60_000L,  // 5min
         locationMinDistance = 30f,

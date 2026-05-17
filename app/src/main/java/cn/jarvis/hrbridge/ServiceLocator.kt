@@ -54,9 +54,25 @@ object ServiceLocator {
     val applicationContext: Context get() = appCtx
     val scope: CoroutineScope get() = appScope
 
+    private fun getProcessName(context: Context): String? {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            return android.app.Application.getProcessName()
+        }
+        val pid = android.os.Process.myPid()
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+        return am?.runningAppProcesses?.find { it.pid == pid }?.processName
+    }
+
     fun init(ctx: Context) {
         if (::appCtx.isInitialized) return
         appCtx = ctx.applicationContext
+
+        // 避免在 :keepalive 辅助进程中初始化整个 Sensor 数据库和 DataStore，防止多进程写锁和资源浪费
+        val processName = getProcessName(appCtx)
+        if (processName != null && processName.endsWith(":keepalive")) {
+            cn.jarvis.hrbridge.util.Logger.i("ServiceLocator", "Skipping initialization in keepalive process: $processName")
+            return
+        }
 
         settingsStore = SettingsStore(appCtx)
         jarvisApi     = JarvisApi()

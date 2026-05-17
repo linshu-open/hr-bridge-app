@@ -59,31 +59,51 @@ class HeartRateService : LifecycleService() {
         promoteToForeground(getString(cn.jarvis.hrbridge.R.string.notif_service_scanning))
 
         lifecycleScope.launch {
-            val s = ServiceLocator.settingsStore.settings.first()
-            currentDeviceMac = s.selectedDeviceMac
-            currentDeviceName = s.selectedDeviceName
+            var isFirst = true
+            ServiceLocator.settingsStore.settings.collect { s ->
+                currentDeviceMac = s.selectedDeviceMac
+                currentDeviceName = s.selectedDeviceName
 
-            // 注册周期上传任务（幂等）
-            UploadWorker.schedule(this@HeartRateService)
+                if (isFirst) {
+                    isFirst = false
+                    // 注册周期上传任务（幂等）
+                    UploadWorker.schedule(this@HeartRateService)
 
-            // M1B-S1: 保证 watchdog 在线
-            BridgeRuntime.ensureWatchdogScheduled(this@HeartRateService)
+                    // M1B-S1: 保证 watchdog 在线
+                    BridgeRuntime.ensureWatchdogScheduled(this@HeartRateService)
 
-            // 启动通用传感器（即使没选手环也可以跑其他传感器）
-            runCatching {
-                ServiceLocator.sensorHub.start(
-                    scope = lifecycleScope,
-                    enabled = s.enabledSensors,
-                    mode = s.uploadMode
-                )
-                ServiceLocator.alertManager.start(lifecycleScope)
-            }.onFailure { Logger.w("HRService", "SensorHub start failed: ${it.message}") }
-            startUploadLoop()
+                    // 启动通用传感器（即使没选手环也可以跑其他传感器）
+                    runCatching {
+                        ServiceLocator.sensorHub.start(
+                            scope = lifecycleScope,
+                            enabled = s.enabledSensors,
+                            mode = s.uploadMode
+                        )
+                        ServiceLocator.alertManager.start(lifecycleScope)
+                    }.onFailure { Logger.w("HRService", "SensorHub start failed: ${it.message}") }
+                    startUploadLoop()
 
-            if (currentDeviceMac.isEmpty()) {
-                Logger.w("HRService", "未配置手环 MAC；仅运行手机传感器")
-            } else {
-                connection.connect(currentDeviceMac)
+                    if (currentDeviceMac.isEmpty()) {
+                        Logger.w("HRService", "未配置手环 MAC；仅运行手机传感器")
+                    } else {
+                        connection.connect(currentDeviceMac)
+                    }
+                } else {
+                    // 后续动态变化：更新传感器状态与模式
+                    runCatching {
+                        ServiceLocator.sensorHub.start(
+                            scope = lifecycleScope,
+                            enabled = s.enabledSensors,
+                            mode = s.uploadMode
+                        )
+                        ServiceLocator.sensorHub.applyMode(s.uploadMode)
+                    }.onFailure { Logger.w("HRService", "SensorHub dynamic update failed: ${it.message}") }
+
+                    // 如果 MAC 地址变了且未连接，尝试连接
+                    if (currentDeviceMac.isNotEmpty() && !connection.isConnected) {
+                        connection.connect(currentDeviceMac)
+                    }
+                }
             }
         }
 
