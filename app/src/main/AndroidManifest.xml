@@ -77,6 +77,15 @@
             </intent-filter>
         </activity>
 
+        <!-- 一像素悬浮窗（屏幕关闭时启动作为保活兜底） -->
+        <activity
+            android:name=".service.OnePixelActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:theme="@style/Theme.OnePixel" />
+
         <!-- 前台服务：BLE 连接 + 心率监测 + 手机传感器 Hub -->
         <service
             android:name=".service.HeartRateService"
