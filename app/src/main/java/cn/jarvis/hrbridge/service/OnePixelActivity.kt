@@ -35,7 +35,7 @@ class OnePixelActivity : Activity() {
         // Register local receiver to finish this activity
         val filter = IntentFilter(ACTION_FINISH_ONE_PIXEL)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(finishReceiver, filter, RECEIVER_NOT_EXPORTED)
+            registerReceiver(finishReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(finishReceiver, filter)
         }
