@@ -22,6 +22,9 @@ interface SensorCollector {
     /** 切换上传模式（可能触发采样率变更） */
     fun onModeChanged(mode: UploadMode) { /* 默认不处理，具体 Collector 覆盖 */ }
 
+    /** 应用动态频率配置（每传感器独立） */
+    fun applyFrequency(config: SensorFreqConfig) { /* 默认不处理 */ }
+
     /** 停止并释放硬件资源 */
     fun stop()
 

@@ -7,8 +7,10 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import cn.jarvis.hrbridge.sensors.Emit
 import cn.jarvis.hrbridge.sensors.SensorCollector
+import cn.jarvis.hrbridge.sensors.SensorFreqConfig
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
+import cn.jarvis.hrbridge.sensors.MotionStateDetector
 import cn.jarvis.hrbridge.sensors.imu.AccelSample
 import cn.jarvis.hrbridge.sensors.imu.ImuWindowAggregator
 import cn.jarvis.hrbridge.sensors.imu.ImuWindowJson
@@ -37,6 +39,7 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
     private val sensor: Sensor? = sm?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
     private var mode: UploadMode = UploadMode.NORMAL
+    private var freqConfig: SensorFreqConfig? = null
     private var emitRef: Emit? = null
     private var scopeRef: CoroutineScope? = null
     private var timerJob: Job? = null
@@ -61,6 +64,9 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
 
     // ---- M1B IMU aggregator ----
     var aggregator: ImuWindowAggregator? = null
+
+    // ---- Motion state detector (master trigger role) ----
+    var motionDetector: MotionStateDetector? = null
     private var deviceId: String = "android-phone"
 
     private val listener = object : SensorEventListener {
@@ -74,6 +80,9 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
 
             // M1B: feed raw sample to IMU window aggregator
             aggregator?.addAccel(AccelSample(System.currentTimeMillis(), x, y, z, mag))
+
+            // Master trigger: feed magnitude to motion state detector
+            motionDetector?.feedMagnitude(mag)
 
             // 跌倒检测：幅值突然大幅下降（从 >15 降到 <5），且随后静止
             if (prevMagnitude > 15f && mag < 5f) {
@@ -127,6 +136,16 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         restartTimer()
     }
 
+    override fun applyFrequency(config: SensorFreqConfig) {
+        if (config == freqConfig) return
+        freqConfig = config
+        // Re-register listener with new accel parameters
+        sm?.unregisterListener(listener)
+        registerListener()
+        restartTimer()
+        Logger.d("Accel", "freq applied: delay=${config.accelDelayUs}us latency=${config.accelReportLatencyUs}us upload=${config.uploadIntervalMs}ms")
+    }
+
     override fun stop() {
         timerJob?.cancel()
         timerJob = null
@@ -139,19 +158,19 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
 
     // ---- internal ----
 
-    private fun sensorDelayUs(): Int = when (mode) {
+    private fun sensorDelayUs(): Int = freqConfig?.accelDelayUs ?: when (mode) {
         UploadMode.POWER_SAVER -> 200_000   // ~5Hz
         UploadMode.NORMAL      -> 100_000   // ~10Hz
         UploadMode.REALTIME    ->  20_000   // ~50Hz
     }
 
-    private fun maxReportLatencyUs(): Int = when (mode) {
+    private fun maxReportLatencyUs(): Int = freqConfig?.accelReportLatencyUs ?: when (mode) {
         UploadMode.POWER_SAVER -> 60_000_000 // 60s
         UploadMode.NORMAL      -> 30_000_000 // 30s
         UploadMode.REALTIME    ->  5_000_000 // 5s
     }
 
-    private fun intervalMs(): Long = when (mode) {
+    private fun intervalMs(): Long = freqConfig?.uploadIntervalMs ?: when (mode) {
         UploadMode.POWER_SAVER -> 5 * 60_000L
         UploadMode.NORMAL      ->     60_000L
         UploadMode.REALTIME    ->     10_000L

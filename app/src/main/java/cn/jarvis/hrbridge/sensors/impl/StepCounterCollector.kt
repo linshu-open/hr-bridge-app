@@ -7,6 +7,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import cn.jarvis.hrbridge.sensors.Emit
 import cn.jarvis.hrbridge.sensors.SensorCollector
+import cn.jarvis.hrbridge.sensors.SensorFreqConfig
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.util.Logger
@@ -35,6 +36,7 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
     private var offsetDay: String = ""
     private var lastEmitTs: Long = 0L
     private var mode: UploadMode = UploadMode.NORMAL
+    private var freqConfig: SensorFreqConfig? = null
     private var emitRef: Emit? = null
     private var scopeRef: CoroutineScope? = null
     private var timerJob: Job? = null
@@ -65,6 +67,13 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
         restartTimer()
     }
 
+    override fun applyFrequency(config: SensorFreqConfig) {
+        if (config == freqConfig) return
+        freqConfig = config
+        restartTimer()
+        Logger.d("StepCounter", "freq applied: upload=${config.uploadIntervalMs}ms")
+    }
+
     override fun stop() {
         timerJob?.cancel()
         timerJob = null
@@ -77,7 +86,7 @@ class StepCounterCollector(private val ctx: Context) : SensorCollector {
         Logger.i("StepCounter", "stopped")
     }
 
-    private fun intervalMs(): Long = when (mode) {
+    private fun intervalMs(): Long = freqConfig?.uploadIntervalMs ?: when (mode) {
         UploadMode.POWER_SAVER -> 15 * 60_000L
         UploadMode.NORMAL      ->  5 * 60_000L
         UploadMode.REALTIME    ->      60_000L

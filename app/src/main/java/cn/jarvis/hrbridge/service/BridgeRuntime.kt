@@ -1,31 +1,54 @@
 package cn.jarvis.hrbridge.service
 
 import android.content.Context
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import cn.jarvis.hrbridge.ServiceLocator
 import cn.jarvis.hrbridge.util.Logger
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import java.util.concurrent.TimeUnit
 
+/**
+ * 运行时生命周期管理器。
+ *
+ * v2 升级：
+ * - 用 AlarmManager 精确定时替代 WorkManager 的 15min 周期（#15）
+ * - 启动双进程 KeepAliveService 作为主进程锚点（#14/#23）
+ * - WatchdogAlarmReceiver 的 1min 心跳 + 双进程互保 = 最大化后台存活率
+ */
 object BridgeRuntime {
 
-    private const val WATCHDOG_WORK_NAME = "jarvis_service_watchdog"
-
     /**
-     * 保证 Watchdog 定时任务被排队。
+     * 调度 AlarmManager 1 分钟心跳看门狗（替代 WorkManager WatchdogWorker）。
+     * 幂等——重复调用只更新闹钟时间。
      */
     fun ensureWatchdogScheduled(context: Context) {
-        val workRequest = PeriodicWorkRequestBuilder<ServiceWatchdogWorker>(15, TimeUnit.MINUTES)
-            .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            WATCHDOG_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            workRequest
-        )
-        Logger.i("BridgeRuntime", "Watchdog periodic work ensured.")
+        WatchdogAlarmReceiver.schedule(context)
+        Logger.i("BridgeRuntime", "AlarmManager watchdog scheduled (1min heartbeat)")
+    }
+
+    /**
+     * 闹钟触发后的回调：检查并拉起服务。
+     * 由 WatchdogAlarmReceiver.onReceive() 调用。
+     */
+    fun onAlarmTriggered(context: Context) {
+        try {
+            val desired = runBlocking {
+                ServiceLocator.settingsStore.settings.first().bridgeDesiredRunning
+            }
+            if (!desired) {
+                Logger.d("BridgeRuntime", "alarm triggered but bridgeDesiredRunning=false, skip")
+                return
+            }
+        } catch (e: Exception) {
+            Logger.w("BridgeRuntime", "cannot read settings on alarm: ${e.message}, starting anyway")
+        }
+
+        // double insurance: ensure both services are running
+        try {
+            HeartRateService.start(context)
+            KeepAliveService.start(context)
+        } catch (e: Exception) {
+            Logger.e("BridgeRuntime", "onAlarmTriggered start failed: ${e.message}")
+        }
     }
 
     /**
@@ -35,17 +58,17 @@ object BridgeRuntime {
     fun ensureScheduledAndMaybeStart(context: Context, reason: String) {
         Logger.i("BridgeRuntime", "ensureScheduledAndMaybeStart triggered. Reason: $reason")
 
+        // 启动 AlarmManager 心跳
         ensureWatchdogScheduled(context)
 
-        // 我们在协程中读取配置，因为它是 flow
-        // runBlocking 在这里是安全的，因为 DataStore 第一次读取很快（在 BroadcastReceiver 里）
         try {
             val desired = runBlocking {
                 ServiceLocator.settingsStore.settings.first().bridgeDesiredRunning
             }
             if (desired) {
-                Logger.i("BridgeRuntime", "bridgeDesiredRunning is true, starting HeartRateService.")
+                Logger.i("BridgeRuntime", "bridgeDesiredRunning is true, starting services.")
                 HeartRateService.start(context)
+                KeepAliveService.start(context)
             } else {
                 Logger.i("BridgeRuntime", "bridgeDesiredRunning is false, ignoring start.")
             }

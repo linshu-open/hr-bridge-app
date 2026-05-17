@@ -88,6 +88,9 @@ object ServiceLocator {
         accelerometerCollector.aggregator = sensorHub.imuAggregator
         gyroscopeCollector.aggregator = sensorHub.imuAggregator
 
+        // M1B: wire motion state detector to accelerometer (master trigger)
+        accelerometerCollector.motionDetector = sensorHub.motionDetector
+
         appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         // 后台跑一次 v1→v2 迁移 + 维护

@@ -7,6 +7,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import cn.jarvis.hrbridge.sensors.Emit
 import cn.jarvis.hrbridge.sensors.SensorCollector
+import cn.jarvis.hrbridge.sensors.SensorFreqConfig
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.sensors.imu.GyroSample
@@ -34,6 +35,7 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     private val sensor: Sensor? = sm?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
     private var mode: UploadMode = UploadMode.NORMAL
+    private var freqConfig: SensorFreqConfig? = null
     private var emitRef: Emit? = null
     private var scopeRef: CoroutineScope? = null
     private var timerJob: Job? = null
@@ -78,6 +80,16 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         restartTimer()
     }
 
+    override fun applyFrequency(config: SensorFreqConfig) {
+        if (config == freqConfig) return
+        freqConfig = config
+        // Re-register listener with new gyro parameters
+        sm?.unregisterListener(listener)
+        registerListener()
+        restartTimer()
+        Logger.d("Gyro", "freq applied: delay=${config.gyroDelayUs}us latency=${config.gyroReportLatencyUs}us upload=${config.uploadIntervalMs}ms")
+    }
+
     override fun stop() {
         timerJob?.cancel()
         timerJob = null
@@ -89,16 +101,16 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
 
     // ---- internal ----
 
-    private fun sensorDelayUs(): Int = when (mode) {
-        UploadMode.POWER_SAVER -> 200_000   // ~5Hz
-        UploadMode.NORMAL      -> 200_000   // ~5Hz
-        UploadMode.REALTIME    ->  40_000   // ~25Hz
+    private fun sensorDelayUs(): Int = freqConfig?.gyroDelayUs ?: when (mode) {
+        UploadMode.POWER_SAVER -> 200_000
+        UploadMode.NORMAL      -> 200_000
+        UploadMode.REALTIME    ->  40_000
     }
 
-    private fun maxReportLatencyUs(): Int = when (mode) {
-        UploadMode.POWER_SAVER -> 60_000_000 // 60s
-        UploadMode.NORMAL      -> 30_000_000 // 30s
-        UploadMode.REALTIME    ->  5_000_000 // 5s
+    private fun maxReportLatencyUs(): Int = freqConfig?.gyroReportLatencyUs ?: when (mode) {
+        UploadMode.POWER_SAVER -> 60_000_000
+        UploadMode.NORMAL      -> 30_000_000
+        UploadMode.REALTIME    ->  5_000_000
     }
 
     private fun registerListener() {
@@ -109,7 +121,7 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         }
     }
 
-    private fun intervalMs(): Long = when (mode) {
+    private fun intervalMs(): Long = freqConfig?.uploadIntervalMs ?: when (mode) {
         UploadMode.POWER_SAVER -> 5 * 60_000L
         UploadMode.NORMAL      ->     60_000L
         UploadMode.REALTIME    ->     10_000L

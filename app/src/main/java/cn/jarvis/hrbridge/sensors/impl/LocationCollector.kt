@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import cn.jarvis.hrbridge.ServiceLocator
 import cn.jarvis.hrbridge.sensors.Emit
 import cn.jarvis.hrbridge.sensors.SensorCollector
+import cn.jarvis.hrbridge.sensors.SensorFreqConfig
 import cn.jarvis.hrbridge.sensors.SensorType
 import cn.jarvis.hrbridge.sensors.UploadMode
 import cn.jarvis.hrbridge.util.Logger
@@ -36,6 +37,7 @@ class LocationCollector(private val ctx: Context) : SensorCollector {
         ctx.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
 
     private var mode: UploadMode = UploadMode.NORMAL
+    private var freqConfig: SensorFreqConfig? = null
     private var emitRef: Emit? = null
     private var scopeRef: CoroutineScope? = null
     private var lastLat: Double = 0.0
@@ -77,6 +79,15 @@ class LocationCollector(private val ctx: Context) : SensorCollector {
         registerLocationUpdates()
     }
 
+    override fun applyFrequency(config: SensorFreqConfig) {
+        if (config == freqConfig) return
+        freqConfig = config
+        // Re-register GPS with new interval & min distance
+        unregisterLocationUpdates()
+        registerLocationUpdates()
+        Logger.d("Location", "freq applied: interval=${config.locationIntervalMs}ms minDist=${config.locationMinDistance}m")
+    }
+
     override fun stop() {
         unregisterLocationUpdates()
         emitRef = null
@@ -86,11 +97,13 @@ class LocationCollector(private val ctx: Context) : SensorCollector {
 
     // ---- internal ----
 
-    private fun intervalMs(): Long = when (mode) {
+    private fun intervalMs(): Long = freqConfig?.locationIntervalMs ?: when (mode) {
         UploadMode.POWER_SAVER -> 15 * 60_000L
         UploadMode.NORMAL      ->  5 * 60_000L
         UploadMode.REALTIME    ->     30_000L
     }
+
+    private fun minDistanceM(): Float = freqConfig?.locationMinDistance ?: 0f
 
     @Suppress("MissingPermission")
     private fun registerLocationUpdates() {
@@ -100,12 +113,13 @@ class LocationCollector(private val ctx: Context) : SensorCollector {
         ) return
 
         val interval = intervalMs()
+        val minDist = minDistanceM()
         // 优先 GPS，fallback 网络
         val provider = if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER))
             LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
 
         try {
-            lm.requestLocationUpdates(provider, interval, 0f, listener)
+            lm.requestLocationUpdates(provider, interval, minDist, listener)
         } catch (e: Exception) {
             Logger.w("Location", "requestLocationUpdates failed: ${e.message}")
         }
