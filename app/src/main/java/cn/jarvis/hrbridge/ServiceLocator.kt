@@ -12,7 +12,7 @@ import cn.jarvis.hrbridge.data.repo.HrRepository
 import cn.jarvis.hrbridge.sensors.AlertManager
 import cn.jarvis.hrbridge.sensors.SensorHub
 import cn.jarvis.hrbridge.sensors.SensorRepository
-import cn.jarvis.hrbridge.sensors.SensorRingBuffer
+
 import cn.jarvis.hrbridge.sensors.impl.AccelerometerCollector
 import cn.jarvis.hrbridge.sensors.impl.BluetoothStateCollector
 import cn.jarvis.hrbridge.sensors.impl.GyroscopeCollector
