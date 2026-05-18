@@ -75,14 +75,6 @@ class HeartRateService : LifecycleService() {
                         ServiceLocator.alertManager.start(lifecycleScope)
                     }.onFailure { Logger.w("HRService", "SensorHub start failed: ${it.message}") }
 
-                    // 启动精确的 AlarmManager 传感器刷新与同步 (V2)
-                    val uploadIntervalMs = when (s.uploadMode) {
-                        UploadMode.POWER_SAVER -> 5 * 60_000L
-                        UploadMode.NORMAL      -> 60_000L
-                        UploadMode.REALTIME    -> 10_000L
-                    }
-                    SensorFlushReceiver.scheduleNext(this@HeartRateService, uploadIntervalMs)
-
                     startUploadLoop()
 
                     if (currentDeviceMac.isEmpty()) {
@@ -99,14 +91,6 @@ class HeartRateService : LifecycleService() {
                             mode = s.uploadMode
                         )
                         ServiceLocator.sensorHub.applyMode(s.uploadMode)
-
-                        // 动态更新 AlarmManager 触发间隔
-                        val uploadIntervalMs = when (s.uploadMode) {
-                            UploadMode.POWER_SAVER -> 5 * 60_000L
-                            UploadMode.NORMAL      -> 60_000L
-                            UploadMode.REALTIME    -> 10_000L
-                        }
-                        SensorFlushReceiver.scheduleNext(this@HeartRateService, uploadIntervalMs)
                     }.onFailure { Logger.w("HRService", "SensorHub dynamic update failed: ${it.message}") }
 
                     // 如果 MAC 地址变了且未连接，尝试连接
@@ -279,7 +263,6 @@ class HeartRateService : LifecycleService() {
         connection.disconnect()
         runCatching { ServiceLocator.alertManager.stop() }
         runCatching { ServiceLocator.sensorHub.stop() }
-        runCatching { SensorFlushReceiver.cancel(this) }
         super.onDestroy()
     }
 

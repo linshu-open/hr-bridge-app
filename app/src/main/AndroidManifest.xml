@@ -98,11 +98,7 @@
             android:exported="false"
             android:enabled="true"/>
 
-        <!-- AlarmManager 传感器缓存批量刷盘与同步接收器 -->
-        <receiver
-            android:name=".service.SensorFlushReceiver"
-            android:exported="false"
-            android:enabled="true"/>
+
 
         <!-- 开机自启 -->
         <receiver

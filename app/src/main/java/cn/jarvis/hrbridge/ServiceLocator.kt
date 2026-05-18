@@ -47,8 +47,6 @@ object ServiceLocator {
     lateinit var sensorHub: SensorHub            ; private set
     lateinit var alertManager: AlertManager       ; private set
     lateinit var bleScanner: BleScanner          ; private set
-    lateinit var accelRing: SensorRingBuffer      ; private set
-    lateinit var gyroRing: SensorRingBuffer       ; private set
     private lateinit var appScope: CoroutineScope
 
     /** 专用给前台服务用；每个 Service 实例独占一个 BleConnection（因为 GATT 是一对一） */
@@ -81,9 +79,6 @@ object ServiceLocator {
         jarvisApi     = JarvisApi()
         githubApi     = GithubApi()
         bleScanner    = BleScanner(appCtx)
- 
-        accelRing = SensorRingBuffer(capacity = 3600, fieldsPerSample = 5)
-        gyroRing = SensorRingBuffer(capacity = 3600, fieldsPerSample = 5)
 
         val db = HrDatabase.get(appCtx)
         hrRepository = HrRepository(db.hrDao(), jarvisApi, settingsStore)
