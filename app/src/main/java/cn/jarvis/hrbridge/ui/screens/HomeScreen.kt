@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cn.jarvis.hrbridge.BuildConfig
 import cn.jarvis.hrbridge.service.HeartRateService
+import cn.jarvis.hrbridge.service.KeepAliveService
 import cn.jarvis.hrbridge.ui.components.HrHero
 import cn.jarvis.hrbridge.ui.components.PermissionDeniedDialog
 import cn.jarvis.hrbridge.ui.components.SensorCards
@@ -42,14 +43,16 @@ fun HomeScreen(
     val ctx = LocalContext.current
     val state by vm.state.collectAsStateWithLifecycle()
 
-    var serviceRunning by remember { mutableStateOf(false) }
+    val serviceDesired = state.settings.bridgeDesiredRunning
+    var serviceRunning by remember(serviceDesired) { mutableStateOf(serviceDesired) }
     var showPermDeniedDialog by remember { mutableStateOf(false) }
 
     val permRequester = rememberPermissionRequester { granted ->
         if (granted) {
-            HeartRateService.start(ctx)
-            serviceRunning = true
             vm.setDesiredRunning(true)
+            HeartRateService.start(ctx)
+            KeepAliveService.start(ctx)
+            serviceRunning = true
         } else if (!granted) {
             showPermDeniedDialog = true
         }
@@ -115,9 +118,10 @@ fun HomeScreen(
                 }
                 OutlinedButton(
                     onClick = {
-                        HeartRateService.stop(ctx)
-                        serviceRunning = false
                         vm.setDesiredRunning(false)
+                        HeartRateService.stop(ctx)
+                        KeepAliveService.stop(ctx)
+                        serviceRunning = false
                     },
                     enabled = serviceRunning,
                     modifier = Modifier.weight(1f)

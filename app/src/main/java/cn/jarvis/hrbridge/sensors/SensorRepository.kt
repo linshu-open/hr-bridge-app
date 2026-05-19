@@ -70,6 +70,33 @@ class SensorRepository(
         val pending = dao.fetchPending(maxBatch)
         if (pending.isEmpty()) return 0
 
+        val ids = pending.map { it.id }
+
+        // 1. 尝试高效的批量上传
+        val sb = StringBuilder()
+        sb.append("{\"batch\":true,\"device_id\":\"")
+        sb.append(s.selectedDeviceName.ifEmpty { "unknown" })
+        sb.append("\",\"events\":[")
+        for (i in pending.indices) {
+            val rec = pending[i]
+            sb.append("{\"sensor_type\":\"").append(rec.sensorType).append("\",")
+            sb.append("\"timestamp\":").append(rec.timestamp).append(",")
+            sb.append("\"values\":").append(rec.dataJson).append("}")
+            if (i < pending.size - 1) sb.append(",")
+        }
+        sb.append("]}")
+        val jsonPayload = sb.toString()
+
+        val batchRes = api.postSensor(base, "upload", jsonPayload)
+        if (batchRes.isSuccess) {
+            dao.markUploaded(ids, System.currentTimeMillis() / 1000)
+            Logger.i("SensorRepo", "Batch upload success: ${pending.size} records")
+            return pending.size
+        } else {
+            Logger.w("SensorRepo", "Batch upload failed: ${batchRes.exceptionOrNull()?.message}, falling back to legacy sequential upload")
+        }
+
+        // 2. 降级回退：传统的逐条循环上传逻辑
         var ok = 0
         for (rec in pending) {
             // 具体每个 sensor 是否启用由 Collector 入口决定；这里不重复过滤

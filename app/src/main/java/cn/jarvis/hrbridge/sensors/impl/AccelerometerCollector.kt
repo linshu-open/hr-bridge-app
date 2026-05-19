@@ -61,6 +61,10 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
     var motionDetector: MotionStateDetector? = null
     private var deviceId: String = "android-phone"
 
+    private var eventCount = 0
+    private var sensorThread: android.os.HandlerThread? = null
+    private var sensorHandler: android.os.Handler? = null
+
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             val x = event.values[0]
@@ -70,8 +74,30 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
             val mag = sqrt(x * x + y * y + z * z)
             lastMagnitude = mag
 
-            // M1B: feed raw sample to IMU window aggregator
-            aggregator?.addAccel(AccelSample(System.currentTimeMillis(), x, y, z, mag))
+            eventCount++
+            if (eventCount % 100 == 0) {
+                Logger.d("Accel", "onSensorChanged called: count=$eventCount x=$x y=$y z=$z")
+            }
+
+            // M1B: feed raw sample to IMU window aggregator and poll in real-time
+            val eventTimeMs = System.currentTimeMillis() - (android.os.SystemClock.elapsedRealtimeNanos() - event.timestamp) / 1_000_000L
+            val agg = aggregator
+            if (agg != null) {
+                agg.addAccel(AccelSample(eventTimeMs, x, y, z, mag))
+                val feature = agg.pollCompleted(System.currentTimeMillis())
+                if (feature != null) {
+                    val scope = scopeRef
+                    val emit = emitRef
+                    if (scope != null && emit != null) {
+                        scope.launch {
+                            val imuJson = ImuWindowJson.toJson(feature, deviceId)
+                            runCatching { emit(SensorType.IMU_WINDOW, imuJson) }
+                                .onFailure { Logger.w("Accel", "imu_window emit failed: ${it.message}") }
+                            agg.clearLocked()
+                        }
+                    }
+                }
+            }
 
             // Master trigger: feed average/raw magnitude to motion detector
             motionDetector?.feedMagnitude(mag)
@@ -141,6 +167,9 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         timerJob?.cancel()
         timerJob = null
         sm?.unregisterListener(listener)
+        sensorThread?.quitSafely()
+        sensorThread = null
+        sensorHandler = null
         emitRef = null
         scopeRef = null
         samples.clear()
@@ -168,14 +197,19 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
     }
 
     private fun registerListener() {
+        if (sensorThread == null) {
+            sensorThread = android.os.HandlerThread("AccelSensorThread").apply { start() }
+            sensorHandler = android.os.Handler(sensorThread!!.looper)
+        }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            sm?.registerListener(listener, sensor, sensorDelayUs(), maxReportLatencyUs())
+            sm?.registerListener(listener, sensor, sensorDelayUs(), maxReportLatencyUs(), sensorHandler)
         } else {
-            sm?.registerListener(listener, sensor, sensorDelayUs())
+            sm?.registerListener(listener, sensor, sensorDelayUs(), sensorHandler)
         }
     }
 
     private fun startTimer() {
+        timerJob?.cancel()
         val scope = scopeRef ?: return
         timerJob = scope.launch {
             while (true) {
@@ -214,19 +248,9 @@ class AccelerometerCollector(private val ctx: Context) : SensorCollector {
         runCatching { emit(SensorType.ACCELEROMETER, json) }
             .onFailure { Logger.w("Accel", "emit failed: ${it.message}") }
 
-        // M1B: poll completed IMU window and upload
-        val agg = aggregator
-        if (agg == null) {
-            Logger.w("Accel", "imu aggregator is null — M1B not wired")
-            return@maybeEmit
-        }
-        val feature = agg.pollCompleted(System.currentTimeMillis())
-        Logger.i("Accel", "imu poll samples=${agg.accelSampleCount()}/${agg.gyroSampleCount()} windowMs=${agg.windowDurationMs} feature=${feature != null}")
-        if (feature != null) {
-            val imuJson = ImuWindowJson.toJson(feature, deviceId)
-            runCatching { emit(SensorType.IMU_WINDOW, imuJson) }
-                .onFailure { Logger.w("Accel", "imu_window emit failed: ${it.message}") }
-            agg.clearLocked()
+        // M1B: log current aggregator statistics
+        aggregator?.let { agg ->
+            Logger.d("Accel", "imu status: samples=${agg.accelSampleCount()}/${agg.gyroSampleCount()} windowMs=${agg.windowDurationMs}")
         }
     }
 

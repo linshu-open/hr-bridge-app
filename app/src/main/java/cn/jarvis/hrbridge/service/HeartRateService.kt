@@ -45,6 +45,7 @@ class HeartRateService : LifecycleService() {
     private var currentDeviceMac: String = ""
     private var currentDeviceName: String = ""
     private var criticalSinceMs: Long = 0L   // 连续 critical 开始时间，用于 30s 响铃规则
+    private var continuousWakeLock: android.os.PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -56,6 +57,23 @@ class HeartRateService : LifecycleService() {
             ServiceLocator.settingsStore.settings.collect { s ->
                 currentDeviceMac = s.selectedDeviceMac
                 currentDeviceName = s.selectedDeviceName
+
+                // M1B: manage continuous wake lock to ensure sensor stream continues when screen goes off
+                val pm = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+                if (continuousWakeLock == null) {
+                    continuousWakeLock = pm?.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Jarvis:ContinuousSensors")
+                }
+                if (s.enabledSensors.isNotEmpty()) {
+                    if (continuousWakeLock?.isHeld == false) {
+                        continuousWakeLock?.acquire()
+                        Logger.i("HRService", "Acquired continuous partial wake lock for sensor background streaming")
+                    }
+                } else {
+                    if (continuousWakeLock?.isHeld == true) {
+                        continuousWakeLock?.release()
+                        Logger.i("HRService", "Released continuous partial wake lock (no sensors enabled)")
+                    }
+                }
 
                 if (isFirst) {
                     isFirst = false
@@ -117,7 +135,6 @@ class HeartRateService : LifecycleService() {
             startForeground(
                 NotifyHelper.NOTIF_ID_SERVICE, notif,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             )
         } else {
@@ -257,6 +274,10 @@ class HeartRateService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        if (continuousWakeLock?.isHeld == true) {
+            continuousWakeLock?.release()
+            Logger.i("HRService", "Released continuous partial wake lock on destroy")
+        }
         reconnectJob?.cancel()
         realtimeModeJob?.cancel()
         uploadLoopJob?.cancel()

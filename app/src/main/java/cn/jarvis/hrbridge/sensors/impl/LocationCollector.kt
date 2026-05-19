@@ -58,9 +58,11 @@ class LocationCollector(private val ctx: Context) : SensorCollector {
             }
 
             // 严格节流：时间间隔未达到且位移未达到设定阈值时丢弃，避免静止时高频上报位置
-            if (lastEmittedTimeMs != 0L && (now - lastEmittedTimeMs < interval - 5000L) && dist < minDist) {
-                Logger.d("Location", "Dropped duplicate/frequent update: elapsed=${now - lastEmittedTimeMs}ms dist=${"%.1f".format(dist)}m")
-                return
+            if (lastEmittedTimeMs != 0L && (now - lastEmittedTimeMs < interval - 5000L)) {
+                if (minDist <= 0f || dist < minDist) {
+                    Logger.d("Location", "Dropped duplicate/frequent update: elapsed=${now - lastEmittedTimeMs}ms dist=${"%.1f".format(dist)}m")
+                    return
+                }
             }
 
             lastLat = loc.latitude
@@ -133,9 +135,15 @@ class LocationCollector(private val ctx: Context) : SensorCollector {
 
         val interval = intervalMs()
         val minDist = minDistanceM()
-        // 优先 GPS，fallback 网络
-        val provider = if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER))
-            LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
+        // 动态选择定位源：若处于 REALTIME（实时追踪）或正在高速移动，启用高精度硬件 GPS；否则使用网络定位，省电且不闪烁 GPS 状态栏图标
+        val provider = if (mode == UploadMode.REALTIME || (freqConfig != null && freqConfig!!.locationIntervalMs < 60_000L)) {
+            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) LocationManager.GPS_PROVIDER 
+            else LocationManager.NETWORK_PROVIDER
+        } else {
+            if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) LocationManager.NETWORK_PROVIDER
+            else if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) LocationManager.GPS_PROVIDER
+            else LocationManager.PASSIVE_PROVIDER
+        }
 
         try {
             lm.requestLocationUpdates(provider, interval, minDist, listener)

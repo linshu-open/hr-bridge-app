@@ -43,6 +43,9 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     // ---- M1B IMU aggregator ----
     var aggregator: ImuWindowAggregator? = null
 
+    private var sensorThread: android.os.HandlerThread? = null
+    private var sensorHandler: android.os.Handler? = null
+
     private val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             val x = event.values[0]
@@ -56,7 +59,8 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
             lastAngularSpeed = speed
 
             // M1B: feed raw sample to IMU window aggregator
-            aggregator?.addGyro(GyroSample(System.currentTimeMillis(), lastX, lastY, lastZ, lastAngularSpeed))
+            val eventTimeMs = System.currentTimeMillis() - (android.os.SystemClock.elapsedRealtimeNanos() - event.timestamp) / 1_000_000L
+            aggregator?.addGyro(GyroSample(eventTimeMs, lastX, lastY, lastZ, lastAngularSpeed))
         }
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
@@ -93,6 +97,9 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
         timerJob?.cancel()
         timerJob = null
         sm?.unregisterListener(listener)
+        sensorThread?.quitSafely()
+        sensorThread = null
+        sensorHandler = null
         emitRef = null
         scopeRef = null
         Logger.i("Gyro", "stopped")
@@ -113,10 +120,14 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     }
 
     private fun registerListener() {
+        if (sensorThread == null) {
+            sensorThread = android.os.HandlerThread("GyroSensorThread").apply { start() }
+            sensorHandler = android.os.Handler(sensorThread!!.looper)
+        }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            sm?.registerListener(listener, sensor, sensorDelayUs(), maxReportLatencyUs())
+            sm?.registerListener(listener, sensor, sensorDelayUs(), maxReportLatencyUs(), sensorHandler)
         } else {
-            sm?.registerListener(listener, sensor, sensorDelayUs())
+            sm?.registerListener(listener, sensor, sensorDelayUs(), sensorHandler)
         }
     }
 
@@ -127,6 +138,7 @@ class GyroscopeCollector(private val ctx: Context) : SensorCollector {
     }
 
     private fun startTimer() {
+        timerJob?.cancel()
         val scope = scopeRef ?: return
         timerJob = scope.launch {
             while (true) {

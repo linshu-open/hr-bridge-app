@@ -1,6 +1,7 @@
 package cn.jarvis.hrbridge.sensors.imu
 
 import cn.jarvis.hrbridge.sensors.UploadMode
+import cn.jarvis.hrbridge.util.Logger
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -32,8 +33,8 @@ class ImuWindowAggregator {
 
     fun addAccel(sample: AccelSample) = synchronized(lock) {
         accelSamples.add(sample)
-        // cap to prevent memory leak from aggressive sampling
-        val maxCap = (windowDurationMs / 1000) * 35 // ~35 samples/sec headroom
+        // cap to prevent memory leak from aggressive sampling (150Hz headroom)
+        val maxCap = (windowDurationMs / 1000) * 150
         if (accelSamples.size > maxCap) {
             val remove = accelSamples.size - maxCap
             for (i in 0 until remove) accelSamples.removeAt(0)
@@ -43,7 +44,8 @@ class ImuWindowAggregator {
 
     fun addGyro(sample: GyroSample) = synchronized(lock) {
         gyroSamples.add(sample)
-        val maxCap = (windowDurationMs / 1000) * 20
+        // 150Hz headroom
+        val maxCap = (windowDurationMs / 1000) * 150
         if (gyroSamples.size > maxCap) {
             val remove = gyroSamples.size - maxCap
             for (i in 0 until remove) gyroSamples.removeAt(0)
@@ -86,6 +88,8 @@ class ImuWindowAggregator {
         // Guard against double-emit within same window
         if (guardedEmitted) return null
 
+        Logger.i("ImuAggregator", "Window completed: start=$start durationMs=$durationMs windowMs=$windowDurationMs")
+
         val windowEnd = nowMs
         val durationSec = ((windowEnd - start) / 1000L).toInt()
 
@@ -106,7 +110,11 @@ class ImuWindowAggregator {
             batterySaver = (mode == UploadMode.POWER_SAVER)
         )
 
-        guardedEmitted = true
+        // Clear samples and reset window states for the next window
+        accelSamples.clear()
+        gyroSamples.clear()
+        windowStartMs = 0L
+        guardedEmitted = false
 
         return ImuWindowFeature(
             windowStartMs = start,

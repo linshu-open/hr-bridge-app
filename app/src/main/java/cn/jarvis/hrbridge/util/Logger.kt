@@ -11,11 +11,11 @@ object Logger {
     private const val ROOT_TAG = "HRBridge"
 
     fun d(tag: String, msg: String) {
-        if (BuildConfig.DEBUG) Log.d("$ROOT_TAG/$tag", msg)
+        Log.w("$ROOT_TAG/$tag", "[DEBUG] $msg")
     }
 
     fun i(tag: String, msg: String) {
-        if (BuildConfig.DEBUG) Log.i("$ROOT_TAG/$tag", msg)
+        Log.w("$ROOT_TAG/$tag", "[INFO] $msg")
     }
 
     fun w(tag: String, msg: String, tr: Throwable? = null) {

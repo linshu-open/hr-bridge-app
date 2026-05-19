@@ -20,6 +20,7 @@ import cn.jarvis.hrbridge.ui.theme.HRBridgeTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        cn.jarvis.hrbridge.service.BridgeRuntime.ensureScheduledAndMaybeStart(this, "MAIN_ACTIVITY_ONCREATE")
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(0, 0),
             navigationBarStyle = SystemBarStyle.auto(0, 0)

@@ -44,10 +44,10 @@ object SensorFrequencyPolicy {
         gyroDelayUs = 200_000,           // 5Hz
         gyroReportLatencyUs = 0,
         lightEnabled = true,
-        locationIntervalMs = 30 * 60_000L,  // 30min
-        locationMinDistance = 50f,
-        uploadIntervalMs = 5 * 60_000L,     // 5min
-        imuWindowMs = 60_000L               // 60s
+        locationIntervalMs = 24 * 60 * 60_000L,  // 24小时 — 静止时极少获取GPS
+        locationMinDistance = 500f,              // 500米位移限制 — 几乎不上传定位
+        uploadIntervalMs = 5 * 60_000L,         // 5分钟汇总上传 — 满足静止时低频传输
+        imuWindowMs = 60_000L                    // 60秒聚合窗口
     )
 
     private val STATIC_NIGHT_CONFIG = SensorFreqConfig(
@@ -56,9 +56,9 @@ object SensorFrequencyPolicy {
         gyroDelayUs = 200_000,
         gyroReportLatencyUs = 0,
         lightEnabled = true,              // 光线仍需响应（开灯=起床信号）
-        locationIntervalMs = 60 * 60_000L, // 60min — 夜间静止不需要频繁定位
-        locationMinDistance = 100f,
-        uploadIntervalMs = 10 * 60_000L,   // 10min
+        locationIntervalMs = 24 * 60 * 60_000L, // 24小时 — 夜间静止不需要定位
+        locationMinDistance = 1000f,
+        uploadIntervalMs = 10 * 60_000L,   // 10分钟
         imuWindowMs = 60_000L
     )
 
@@ -112,7 +112,11 @@ object SensorFrequencyPolicy {
 
     // ── Public API ──
 
-    fun forMotionState(state: MotionState, now: LocalTime = LocalTime.now()): SensorFreqConfig {
+    fun forMotionState(state: MotionState, mode: UploadMode, now: LocalTime = LocalTime.now()): SensorFreqConfig {
+        if (mode == UploadMode.REALTIME) {
+            // 在 REALTIME 模式下，强制使用 WALKING_CONFIG 高频配置，完全豁免静止时的节流降频，以获得极速 10s 级反馈
+            return WALKING_CONFIG
+        }
         val config = when (state) {
             MotionState.STATIC -> {
                 if (isNight(now)) STATIC_NIGHT_CONFIG else STATIC_CONFIG
@@ -122,7 +126,7 @@ object SensorFrequencyPolicy {
             MotionState.WALKING -> WALKING_CONFIG
             MotionState.VEHICLE -> VEHICLE_CONFIG
         }
-        Logger.d("FreqPolicy", "Config for $state (night=${isNight(now)}): accel=${config.accelDelayUs}us upload=${config.uploadIntervalMs}ms")
+        Logger.d("FreqPolicy", "Config for $state mode=$mode (night=${isNight(now)}): accel=${config.accelDelayUs}us upload=${config.uploadIntervalMs}ms")
         return config
     }
 
@@ -138,8 +142,8 @@ object SensorFrequencyPolicy {
      * 当运动状态改变时，返回目标配置。
      * 调用方（SensorHub）负责应用新配置到各 Collector。
      */
-    fun onMotionStateChanged(old: MotionState, new: MotionState, now: LocalTime = LocalTime.now()): SensorFreqConfig {
-        Logger.i("FreqPolicy", "Motion state: $old → $new")
-        return forMotionState(new, now)
+    fun onMotionStateChanged(old: MotionState, new: MotionState, mode: UploadMode, now: LocalTime = LocalTime.now()): SensorFreqConfig {
+        Logger.i("FreqPolicy", "Motion state: $old → $new, mode=$mode")
+        return forMotionState(new, mode, now)
     }
 }

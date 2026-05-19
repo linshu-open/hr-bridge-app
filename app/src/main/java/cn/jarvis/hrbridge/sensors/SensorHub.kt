@@ -37,7 +37,7 @@ class SensorHub(
 
     /** Current per-sensor frequency config (recalculated on motion state change) */
     @Volatile
-    var currentFreqConfig: SensorFreqConfig = SensorFrequencyPolicy.forMotionState(MotionState.STATIC)
+    var currentFreqConfig: SensorFreqConfig = SensorFrequencyPolicy.forMotionState(MotionState.STATIC, currentMode)
         private set
 
     init {
@@ -48,7 +48,7 @@ class SensorHub(
 
     override fun onMotionStateChanged(old: MotionState, new: MotionState) {
         currentMotionState = new
-        val config = SensorFrequencyPolicy.onMotionStateChanged(old, new)
+        val config = SensorFrequencyPolicy.onMotionStateChanged(old, new, currentMode)
         currentFreqConfig = config
         applyFrequencyToAll(config)
         // Apply dynamic IMU window duration according to the motion policy
@@ -94,6 +94,8 @@ class SensorHub(
                 /* want == isRunning */
             }
         }
+        // Recalculate start freq config under the correct mode
+        currentFreqConfig = SensorFrequencyPolicy.forMotionState(currentMotionState, mode)
         // Apply initial frequency config after start
         applyFrequencyToAll(currentFreqConfig)
         imuAggregator.applyWindowDuration(currentFreqConfig.imuWindowMs)
@@ -103,11 +105,16 @@ class SensorHub(
         if (mode == currentMode) return
         currentMode = mode
         imuAggregator.applyMode(mode)
-        // Per-sensor frequency still driven by motion state; mode is an override layer
+        // Recalculate and apply frequency config when mode changes
+        val config = SensorFrequencyPolicy.forMotionState(currentMotionState, mode)
+        currentFreqConfig = config
+        applyFrequencyToAll(config)
+        imuAggregator.applyWindowDuration(config.imuWindowMs)
+
         for (c in collectors) {
             if (c.type in running) runCatching { c.onModeChanged(mode) }
         }
-        Logger.i("SensorHub", "mode → ${mode.wire}, motion=${currentMotionState}")
+        Logger.i("SensorHub", "mode → ${mode.wire}, motion=${currentMotionState}, freq: accel=${config.accelDelayUs}us upload=${config.uploadIntervalMs}ms")
     }
 
     fun stop() {
