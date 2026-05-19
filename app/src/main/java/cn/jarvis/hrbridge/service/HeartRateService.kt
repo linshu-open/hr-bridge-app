@@ -135,6 +135,7 @@ class HeartRateService : LifecycleService() {
             startForeground(
                 NotifyHelper.NOTIF_ID_SERVICE, notif,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             )
         } else {

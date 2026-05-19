@@ -83,7 +83,7 @@
         <service
             android:name=".service.HeartRateService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|location"/>
+            android:foregroundServiceType="connectedDevice|health|location"/>
 
         <!-- 双进程守护前台服务：独立进程，作为主进程锚点 -->
         <service
