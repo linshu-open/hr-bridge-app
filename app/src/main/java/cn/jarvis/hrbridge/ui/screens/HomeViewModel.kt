@@ -90,6 +90,8 @@ class HomeViewModel : ViewModel() {
 
     fun clearTestMessage() { _testMessage.value = null }
 
+    fun showMessage(msg: String) { _testMessage.value = msg }
+
     fun setDesiredRunning(desired: Boolean) {
         viewModelScope.launch {
             ServiceLocator.settingsStore.setBridgeDesiredRunning(desired)

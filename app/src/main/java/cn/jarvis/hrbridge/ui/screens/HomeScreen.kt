@@ -33,6 +33,7 @@ import cn.jarvis.hrbridge.ui.components.StatsCards
 import cn.jarvis.hrbridge.ui.components.TrendChart
 import cn.jarvis.hrbridge.ui.components.openAppSettings
 import cn.jarvis.hrbridge.ui.components.rememberPermissionRequester
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
@@ -141,7 +142,7 @@ fun HomeScreen(
                 Text(if (state.hasDevice) "切换设备" else "扫描 BLE 设备")
             }
 
-            // 测试服务器
+            // 测试服务器 & 手动同步
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -162,7 +163,48 @@ fun HomeScreen(
                     } else {
                         Icon(Icons.Default.Check, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("测试服务器")
+                        Text("测试")
+                    }
+                }
+
+                var syncing by remember { mutableStateOf(false) }
+                val coroutineScope = rememberCoroutineScope()
+                Button(
+                    onClick = {
+                        syncing = true
+                        coroutineScope.launch {
+                            kotlin.runCatching {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val db = cn.jarvis.hrbridge.data.local.HrDatabase.get(ctx)
+                                    val sensorN = cn.jarvis.hrbridge.service.SyncUploader.flushSync(db, maxBatch = 100)
+                                    val hrN = cn.jarvis.hrbridge.ServiceLocator.hrRepository.flushBatch(maxBatch = 100)
+                                    "上传通用 $sensorN 条，心率 $hrN 条"
+                                }
+                            }.fold(
+                                onSuccess = { msg ->
+                                    vm.showMessage("同步完成：$msg")
+                                },
+                                onFailure = { err ->
+                                    vm.showMessage("同步失败: ${err.message}")
+                                }
+                            )
+                            syncing = false
+                        }
+                    },
+                    enabled = !syncing,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (syncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("同步中…")
+                    } else {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("手动同步")
                     }
                 }
             }
